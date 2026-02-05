@@ -2,11 +2,12 @@ import csv
 import time
 import slixmpp
 from slixmpp.xmlstream import ET
-from pqc_wrapper import PQCProvider
+from crypto.pqc_wrapper import PQCProvider
+from metrics.realtime import RealtimeStats
 
 NS = "urn:uma:tfm:pqc:0"
 
-OUT_CSV = "receiver_metrics.csv"
+OUT_CSV = "artifacts/csv/receiver_metrics.csv"
 
 
 class ReceptorBench(slixmpp.ClientXMPP):
@@ -41,6 +42,7 @@ class ReceptorBench(slixmpp.ClientXMPP):
             "verify_ok",
         ])
         self.writer.writeheader()
+        self.stats = RealtimeStats(window=50)
 
     async def start(self, _):
         self.send_presence()
@@ -88,6 +90,14 @@ class ReceptorBench(slixmpp.ClientXMPP):
         self.writer.writerow(row)
         self.csv_f.flush()
 
+        # Realtime stats (consola)
+        self.stats.add(
+            verify_ms=vr.verify_time_ms,
+            stanza_bytes=stanza_bytes,
+        )
+        self.stats.maybe_print(prefix=f"[{alg}] ")
+
+
         # Responder receipt (RTT en el emisor)
         self._send_receipt_if_requested(msg)
 
@@ -112,5 +122,5 @@ if __name__ == "__main__":
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 
-    bot.connect(host="localhost", port=5222)
+    bot.connect(host="10.255.255.254", port=5222)
     bot.loop.run_forever()

@@ -3,15 +3,16 @@ import csv
 import time
 import slixmpp
 from slixmpp.xmlstream import ET
-from pqc_wrapper import PQCProvider
+from crypto.pqc_wrapper import PQCProvider
+from metrics.realtime import RealtimeStats
 
 NS = "urn:uma:tfm:pqc:0"
 
-OUT_CSV = "sender_metrics.csv"
+OUT_CSV = "artifacts/csv/sender_metrics.csv"
 
 # Algoritmos a probar
 ALGS = [
-    ("ML-DSA", "ML-DSA-65", 100),
+    # ("ML-DSA", "ML-DSA-65", 100),
     ("SPHINCS", "SPHINCS+-SHA2-128s-simple", 100),
 ]
 
@@ -52,6 +53,7 @@ class EmisorBench(slixmpp.ClientXMPP):
             "receipt_ok",
         ])
         self.writer.writeheader()
+        self.stats = RealtimeStats(window=50)
 
     async def start(self, _):
         self.send_presence()
@@ -141,6 +143,14 @@ class EmisorBench(slixmpp.ClientXMPP):
                 self.writer.writerow(row)
                 self.csv_f.flush()
 
+                # Realtime stats (consola)
+                self.stats.add(
+                    rtt_ms=rtt_ms,
+                    sign_ms=sign_res.sign_time_ms,
+                    stanza_bytes=stanza_bytes,
+                )
+                self.stats.maybe_print(prefix=f"[{alg_name}] ")
+
                 # Pequeño pacing para no saturar
                 await asyncio.sleep(0.05)
 
@@ -156,5 +166,5 @@ if __name__ == "__main__":
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 
-    bot.connect(host="localhost", port=5222)
+    bot.connect(host="10.255.255.254", port=5222)
     bot.loop.run_forever()

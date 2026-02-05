@@ -4,7 +4,7 @@ import asyncio
 
 from slixmpp.xmlstream import ET
 
-from pqc_wrapper import PQCProvider
+from crypto.pqc_wrapper import PQCProvider
 
 
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
     bot.register_plugin("xep_0030")  # Service Discovery (no imprescindible)
 
-    bot.connect(host="localhost", port=5222)
+    bot.connect(host="10.255.255.254", port=5222)
 
     bot.loop.run_forever()
 
