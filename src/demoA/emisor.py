@@ -108,13 +108,13 @@ class EmisorPQC(slixmpp.ClientXMPP):
 
         sig_el = ET.SubElement(pqc_tag, f"{{{NS}}}sig")
 
-        sig_el.text = data["sig"]
+        sig_el.text = data.sig_b64
 
 
 
         pk_el = ET.SubElement(pqc_tag, f"{{{NS}}}pk")
 
-        pk_el.text = data["pk"]
+        pk_el.text = data.pk_b64
 
 
 

@@ -1,4 +1,5 @@
-liboqs-python 
-slixmpp 
+liboqs-python
+slixmpp
 matplotlib
 pandas
+scipy
