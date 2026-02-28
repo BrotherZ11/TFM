@@ -142,7 +142,7 @@ class ReceptorPQC(slixmpp.ClientXMPP):
 
         print(f"Algoritmo: {alg}")
 
-        print(f"Verificación: {'VÁLIDA' if is_valid else 'ERROR'}")
+        print(f"Verificación: {'VÁLIDA' if is_valid.ok else 'ERROR'}")
 
         print(f"Tiempo Verificación: {(end_v - start_v) * 1000:.2f} ms")
 

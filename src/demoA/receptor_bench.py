@@ -1,4 +1,6 @@
+import argparse
 import csv
+import os
 import time
 import slixmpp
 from slixmpp.xmlstream import ET
@@ -11,7 +13,7 @@ OUT_CSV = "artifacts/csv/receiver_metrics.csv"
 
 
 class ReceptorBench(slixmpp.ClientXMPP):
-    def __init__(self, jid, password):
+    def __init__(self, jid, password, startup_timeout_s=20):
         super().__init__(jid, password)
 
         # Laboratorio local (sin TLS)
@@ -21,11 +23,17 @@ class ReceptorBench(slixmpp.ClientXMPP):
         self["feature_mechanisms"].unencrypted_plain = True
 
         self.boundjid.resource = "bench"
+        self.startup_timeout_s = startup_timeout_s
+        self.session_ready = False
+        self.exit_code = 0
 
         self.pqc = PQCProvider()
 
         self.add_event_handler("session_start", self.start)
         self.add_event_handler("message", self.on_message)
+        self.add_event_handler("failed_auth", self.on_failed_auth)
+        self.add_event_handler("connection_failed", self.on_connection_failed)
+        self.add_event_handler("disconnected", self.on_disconnected)
 
         # CSV
         self.csv_f = open(OUT_CSV, "w", newline="", encoding="utf-8")
@@ -45,9 +53,30 @@ class ReceptorBench(slixmpp.ClientXMPP):
         self.stats = RealtimeStats(window=50)
 
     async def start(self, _):
+        self.session_ready = True
         self.send_presence()
         await self.get_roster()
         print("ReceptorBench listo. Guardando en:", OUT_CSV)
+
+    def on_failed_auth(self, _):
+        if not self.session_ready:
+            print("ERROR: autenticación XMPP fallida (usuario/contraseña).")
+            self.exit_code = 2
+            self.disconnect()
+
+    def on_connection_failed(self, _):
+        if not self.session_ready:
+            print("WARN: conexión XMPP fallida; reintentando hasta timeout de arranque.")
+
+    def on_disconnected(self, _):
+        if not self.session_ready and self.exit_code == 0:
+            self.exit_code = 2
+
+    def _startup_watchdog(self):
+        if not self.session_ready:
+            print(f"ERROR: timeout de arranque ({self.startup_timeout_s}s) esperando session_start.")
+            self.exit_code = 2
+            self.disconnect()
 
     def on_message(self, msg):
         if msg["type"] not in ("chat", "normal"):
@@ -118,9 +147,17 @@ class ReceptorBench(slixmpp.ClientXMPP):
 
 
 if __name__ == "__main__":
-    bot = ReceptorBench("receptor@localhost", "123")
+    parser = argparse.ArgumentParser(description="Receptor benchmark con firmas PQC")
+    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--startup-timeout", type=int, default=20)
+    args = parser.parse_args()
+
+    bot = ReceptorBench("receptor@localhost", "123", startup_timeout_s=args.startup_timeout)
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 
-    bot.connect(host="10.255.255.254", port=5222)
+    bot.connect(host=args.host, port=args.port)
+    bot.loop.call_later(args.startup_timeout, bot._startup_watchdog)
     bot.loop.run_forever()
+    raise SystemExit(bot.exit_code)

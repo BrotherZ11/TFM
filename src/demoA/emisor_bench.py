@@ -1,5 +1,7 @@
 import asyncio
+import argparse
 import csv
+import os
 import time
 import slixmpp
 from slixmpp.xmlstream import ET
@@ -12,13 +14,13 @@ OUT_CSV = "artifacts/csv/sender_metrics.csv"
 
 # Algoritmos a probar
 ALGS = [
-    # ("ML-DSA", "ML-DSA-65", 100),
+    ("ML-DSA", "ML-DSA-65", 100),
     ("SPHINCS", "SPHINCS+-SHA2-128s-simple", 100),
 ]
 
 
 class EmisorBench(slixmpp.ClientXMPP):
-    def __init__(self, jid, password, recipient):
+    def __init__(self, jid, password, recipient, startup_timeout_s=20):
         super().__init__(jid, password)
 
         self.use_tls = False
@@ -29,12 +31,18 @@ class EmisorBench(slixmpp.ClientXMPP):
         self.boundjid.resource = "bench"
 
         self.recipient = recipient
+        self.startup_timeout_s = startup_timeout_s
+        self.session_ready = False
+        self.exit_code = 0
         self.pqc = PQCProvider()
 
         self.pending = {}  # msg_id -> (send_time_perf, future)
 
         self.add_event_handler("session_start", self.start)
         self.add_event_handler("receipt_received", self.on_receipt)
+        self.add_event_handler("failed_auth", self.on_failed_auth)
+        self.add_event_handler("connection_failed", self.on_connection_failed)
+        self.add_event_handler("disconnected", self.on_disconnected)
 
         # CSV
         self.csv_f = open(OUT_CSV, "w", newline="", encoding="utf-8")
@@ -56,13 +64,35 @@ class EmisorBench(slixmpp.ClientXMPP):
         self.stats = RealtimeStats(window=50)
 
     async def start(self, _):
+        self.session_ready = True
         self.send_presence()
         await self.get_roster()
         await asyncio.sleep(0.2)
 
         print("EmisorBench listo. Guardando en:", OUT_CSV)
         await self.run_benchmark()
+        self.exit_code = 0
         self.disconnect()
+
+    def on_failed_auth(self, _):
+        if not self.session_ready:
+            print("ERROR: autenticación XMPP fallida (usuario/contraseña).")
+            self.exit_code = 2
+            self.disconnect()
+
+    def on_connection_failed(self, _):
+        if not self.session_ready:
+            print("WARN: conexión XMPP fallida; reintentando hasta timeout de arranque.")
+
+    def on_disconnected(self, _):
+        if not self.session_ready and self.exit_code == 0:
+            self.exit_code = 2
+
+    def _startup_watchdog(self):
+        if not self.session_ready:
+            print(f"ERROR: timeout de arranque ({self.startup_timeout_s}s) esperando session_start.")
+            self.exit_code = 2
+            self.disconnect()
 
     def on_receipt(self, msg):
         # msg['receipt'] contiene el id del mensaje recibido
@@ -162,9 +192,17 @@ class EmisorBench(slixmpp.ClientXMPP):
 
 
 if __name__ == "__main__":
-    bot = EmisorBench("emisor@localhost", "123", "receptor@localhost")
+    parser = argparse.ArgumentParser(description="Emisor benchmark con firmas PQC")
+    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--startup-timeout", type=int, default=20)
+    args = parser.parse_args()
+
+    bot = EmisorBench("emisor@localhost", "123", "receptor@localhost", startup_timeout_s=args.startup_timeout)
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 
-    bot.connect(host="10.255.255.254", port=5222)
+    bot.connect(host=args.host, port=args.port)
+    bot.loop.call_later(args.startup_timeout, bot._startup_watchdog)
     bot.loop.run_forever()
+    raise SystemExit(bot.exit_code)
