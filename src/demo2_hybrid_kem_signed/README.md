@@ -33,9 +33,9 @@ CSV:
 
 ### Modos de verificación
 
-1. **`cert`**: verificación por certificado PQC (perfil X.509-like)
-	 - El emisor adjunta certificado firmado con `ML-DSA` o `SPHINCS+`.
-	 - El receptor valida firma del certificado, validez temporal y firma del `HELLO` con la clave pública del certificado.
+1. **`cert`**: verificación por certificado **X.509 real** (PEM/DER)
+	 - El emisor adjunta un certificado X.509 válido con extensiones PQC (`sig_alg` y clave pública PQC del sujeto).
+	 - El receptor valida firma y validez temporal del X.509, y verifica la firma del `HELLO` con la clave PQC contenida en el certificado.
 
 2. **`qr`**: verificación por huella (simulando escaneo QR)
 	 - El receptor solo acepta certificados cuya huella esté en `trusted_qr_fingerprints.txt`.
@@ -56,7 +56,20 @@ Ejemplo `qr`:
 
 Generar certificado y payload QR:
 
-- `PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/pqc_pki_tool.py --sig-alg ML-DSA-65 --subject-dn "CN=emisor@localhost,O=UMA,C=ES" --out-cert-json-file artifacts/csv/emisor_cert_mldsa.json --out-qr-payload-file artifacts/csv/emisor_cert_mldsa_qr.txt`
+- `PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/pqc_pki_tool.py --sig-alg ML-DSA-65 --subject-dn "CN=emisor@localhost,O=UMA,C=ES" --out-cert-pem-file artifacts/csv/emisor_cert_mldsa.pem --out-qr-payload-file artifacts/csv/emisor_cert_mldsa_qr.txt`
+
+### Evaluación SPHINCS+ vs ML-DSA (modo cert)
+
+1) Ejecuta receptor y emisor en `--verify-mode cert` para generar:
+- `artifacts/csv/hybrid_xmpp_sender_metrics.csv`
+- `artifacts/csv/hybrid_xmpp_receiver_metrics.csv`
+
+2) Ejecuta análisis estadístico (IC95 + Mann-Whitney U):
+
+- `PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py`
+
+3) Revisa comparación por dataset `hybrid_xmpp_sender` y `hybrid_xmpp_receiver` en:
+- `artifacts/csv/statistical_analysis.csv`
 
 Notas de estandarización X.509 + PQC:
 

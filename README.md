@@ -89,7 +89,7 @@ Salida:
 - `artifacts/csv/hybrid_xmpp_receiver_metrics.csv`
 
 Modos de verificación soportados:
-- `cert`: certificado PQC (perfil X.509-like) firmado con ML-DSA/SPHINCS+
+- `cert`: certificado X.509 real (PEM/DER) con extensiones PQC para `sig_alg` y clave pública PQC del sujeto
 - `qr`: pinning por huella (simulación de validación por QR)
 
 ## Demo 3: análisis y gráficas

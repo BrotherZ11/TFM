@@ -12,7 +12,7 @@ class HybridHelloData:
     nonce: str
     kem_pk_b64: str
     sig_b64: str
-    cert_json: str
+    cert_pem: str
     cert_fingerprint_sha256: str
 
 

@@ -8,7 +8,7 @@ import slixmpp
 from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
-from crypto.pqc_certificate import certificate_from_json, verify_certificate
+from crypto.pqc_certificate import certificate_from_pem, verify_certificate
 from metrics.realtime import RealtimeStats
 from demo2_hybrid_kem_signed.protocol import NS_HYBRID, hello_message_to_sign, sha256_hex_from_b64, load_trusted_values
 
@@ -124,20 +124,22 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
 
         kem_pk_el = hello.find(f"{{{NS_HYBRID}}}kem_pk")
         sig_el = hello.find(f"{{{NS_HYBRID}}}sig")
-        cert_el = hello.find(f"{{{NS_HYBRID}}}cert_json")
+        cert_el = hello.find(f"{{{NS_HYBRID}}}cert_pem")
+        if cert_el is None:
+            cert_el = hello.find(f"{{{NS_HYBRID}}}cert_json")
         cert_fp_el = hello.find(f"{{{NS_HYBRID}}}cert_fingerprint_sha256")
 
         kem_pk_b64 = (kem_pk_el.text or "").strip() if kem_pk_el is not None else ""
         sig_b64 = (sig_el.text or "").strip() if sig_el is not None else ""
-        cert_json = (cert_el.text or "").strip() if cert_el is not None else ""
+        cert_pem = (cert_el.text or "").strip() if cert_el is not None else ""
         cert_fingerprint_claim = (cert_fp_el.text or "").strip() if cert_fp_el is not None else ""
 
         hello_stanza_bytes = len(ET.tostring(msg.xml, encoding="utf-8"))
 
-        if not (kem_alg and sig_alg and nonce and kem_pk_b64 and sig_b64 and cert_json and cert_fingerprint_claim):
+        if not (kem_alg and sig_alg and nonce and kem_pk_b64 and sig_b64 and cert_pem and cert_fingerprint_claim):
             return
 
-        cert = certificate_from_json(cert_json)
+        cert = certificate_from_pem(cert_pem)
         cert_check = verify_certificate(
             cert,
             self.pqc,
@@ -154,7 +156,7 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
                 sig_alg,
                 hello_message_to_sign(kem_alg, kem_pk_b64, nonce, cert_fingerprint_claim),
                 sig_b64,
-                cert["tbs"]["subject_public_key_b64"],
+                cert["pqc_subject_public_key_b64"],
             )
         else:
             vr = self.pqc.verify_signature(sig_alg, b"", "", "")

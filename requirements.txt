@@ -3,3 +3,4 @@ slixmpp
 matplotlib
 pandas
 scipy
+cryptography

@@ -8,11 +8,11 @@
 
 ## 2) Enfoque aplicado en este repositorio
 
-Para no perder trazabilidad experimental y mantener compatibilidad con tu stack actual (`slixmpp` + `oqs-python`), se implementa un **perfil X.509-like**:
+En `Demo 2B` se usa un certificado **X.509 real** (PEM/DER) y se incorporan los campos PQC en extensiones privadas:
 
-- Campos inspirados en TBSCertificate: `version`, `serial_number`, `issuer_dn`, `subject_dn`, `not_before`, `not_after`, `sig_alg`, `subject_public_key_b64`, `extensions`.
-- Firma del bloque TBS con ML-DSA o SPHINCS+.
-- Huella SHA-256 del certificado completo.
+- Extensión OID privada con `sig_alg` (ML-DSA o SPHINCS+) y `subject_public_key_b64`.
+- Extensión OID privada con la clave pública del emisor para validación autónoma en el benchmark.
+- Verificación de validez temporal y firma X.509 en receptor.
 
 Esto permite comparar dos modelos de confianza en el handshake:
 
@@ -21,14 +21,14 @@ Esto permite comparar dos modelos de confianza en el handshake:
 
 ## 3) Relación con X.509 real
 
-- Este perfil **no reemplaza** un X.509 DER/PEM en producción.
-- Sí es válido para el objetivo experimental del TFM: medir coste criptográfico y de transporte con semántica PKI equivalente.
-- Si quieres una demo adicional “100% X.509 real con PQC”, la vía recomendada es OpenSSL + oqs-provider y validar fuera de Python con scripts de soporte.
+- La estructura de certificado es X.509 real y portable (`PEM/DER`).
+- El material PQC viaja como metadato en extensiones privadas para mantener compatibilidad con `oqs-python`.
+- Para una cadena PKI PQC totalmente estándar (OID PQC nativos en SPKI/firma de cert), la vía recomendada sigue siendo OpenSSL + oqs-provider.
 
 ## 4) Recomendación para la memoria
 
 Indica explícitamente:
 
-- “Se usa un perfil X.509-like firmado con PQC por limitaciones de soporte nativo en la pila Python actual”.
-- “La semántica de verificación (validez temporal, identidad de emisor, pinning por huella) se preserva”.
-- “Los resultados de rendimiento/overhead son representativos del coste PQC en la capa de mensajería”.
+- “En Demo 2B se emplea certificado X.509 real con extensiones privadas para transportar identidad PQC”.
+- “La comparación ML-DSA vs SPHINCS+ se realiza en el coste de firma/verificación del `HELLO` autenticado por el certificado”.
+- “El análisis estadístico usa IC95 y Mann-Whitney U sobre los CSV de `hybrid_xmpp_*`”.

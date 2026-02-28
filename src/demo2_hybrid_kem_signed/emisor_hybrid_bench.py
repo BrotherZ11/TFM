@@ -9,7 +9,7 @@ import slixmpp
 from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
-from crypto.pqc_certificate import create_certificate, create_self_signed_certificate, certificate_to_json
+from crypto.pqc_certificate import create_certificate, create_self_signed_certificate, certificate_to_pem
 from metrics.realtime import RealtimeStats
 from demo2_hybrid_kem_signed.protocol import NS_HYBRID, hello_message_to_sign, sha256_hex_from_b64
 
@@ -118,8 +118,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 pqc=self.pqc,
                 sig_alg=sig_alg,
                 issuer_dn=self.issuer_dn,
-                issuer_secret_key_b64=ca_secret,
-                issuer_public_key_b64=ca_public,
+                issuer_private_key_pem=ca_secret,
                 subject_dn=subject_dn,
                 subject_public_key_b64=signer_kp.public_key_b64,
                 validity_days=365,
@@ -141,7 +140,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
             "public_key_b64": signer_kp.public_key_b64,
             "cert": cert,
             "cert_fingerprint": cert["fingerprint_sha256"],
-            "cert_json": certificate_to_json(cert),
+            "cert_pem": certificate_to_pem(cert),
         }
         self.identity_by_alg[sig_alg] = identity
         return identity
@@ -268,8 +267,8 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 sig_el = ET.SubElement(hello, f"{{{NS_HYBRID}}}sig")
                 sig_el.text = sign.sig_b64
 
-                cert_el = ET.SubElement(hello, f"{{{NS_HYBRID}}}cert_json")
-                cert_el.text = identity["cert_json"]
+                cert_el = ET.SubElement(hello, f"{{{NS_HYBRID}}}cert_pem")
+                cert_el.text = identity["cert_pem"]
 
                 cert_fp_el = ET.SubElement(hello, f"{{{NS_HYBRID}}}cert_fingerprint_sha256")
                 cert_fp_el.text = identity["cert_fingerprint"]
@@ -317,7 +316,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     "ok": result["ok"],
                     "verify_mode": self.verify_mode,
                     "cert_fingerprint_sha256": identity["cert_fingerprint"],
-                    "cert_bytes": len(identity["cert_json"].encode("utf-8")),
+                    "cert_bytes": len(identity["cert_pem"].encode("utf-8")),
                 }
                 self.writer.writerow(row)
                 self.csv_f.flush()

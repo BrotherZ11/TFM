@@ -80,7 +80,7 @@ sudo tshark -i any -a duration:60 -w artifacts/pcap/demo2a_local_optional.pcapng
 
 ---
 
-## 3) Demo 2B — Handshake híbrido XMPP (modo cert)
+## 3) Demo 2B — Handshake híbrido XMPP (modo cert, X.509 real)
 
 ### Terminal A — Captura tshark
 
@@ -108,6 +108,19 @@ PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/emisor_hybrid_bench.p
 ### Parar captura
 
 En Terminal A: `Ctrl+C`
+
+### Comparativa nueva (SPHINCS+ vs ML-DSA)
+
+Tras ejecutar Demo 2B, genera el análisis estadístico (IC95 + Mann-Whitney U):
+
+```bash
+cd /home/david/TFM
+source venv/bin/activate
+PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
+```
+
+Resultado:
+- `artifacts/csv/statistical_analysis.csv`
 
 ---
 
@@ -186,4 +199,12 @@ En otra terminal:
 ```bash
 cd /home/david/TFM
 ./scripts/run_all_demos.sh
+```
+
+Al terminar, ejecuta también el análisis estadístico nuevo:
+
+```bash
+cd /home/david/TFM
+source venv/bin/activate
+PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
 ```
