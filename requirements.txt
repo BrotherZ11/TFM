@@ -2,3 +2,4 @@ liboqs-python
 slixmpp 
 matplotlib
 pandas
+scipy

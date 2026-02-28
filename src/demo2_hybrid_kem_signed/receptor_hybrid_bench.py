@@ -2,6 +2,7 @@ import csv
 import argparse
 import os
 import time
+from pathlib import Path
 
 import slixmpp
 from slixmpp.xmlstream import ET
@@ -50,7 +51,8 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
         self.add_event_handler("disconnected", self.on_disconnected)
 
         os.makedirs("artifacts/csv", exist_ok=True)
-        self.csv_f = open(OUT_CSV, "w", newline="", encoding="utf-8")
+        csv_exists = Path(OUT_CSV).exists() and Path(OUT_CSV).stat().st_size > 0
+        self.csv_f = open(OUT_CSV, "a", newline="", encoding="utf-8")
         self.writer = csv.DictWriter(
             self.csv_f,
             fieldnames=[
@@ -71,7 +73,8 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
                 "receiver_total_ms",
             ],
         )
-        self.writer.writeheader()
+        if not csv_exists:
+            self.writer.writeheader()
         self.stats = RealtimeStats(window=50)
 
     async def start(self, _):
