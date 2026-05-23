@@ -3,6 +3,7 @@ import argparse
 import csv
 import os
 import time
+import psutil as _psutil
 import slixmpp
 from slixmpp.xmlstream import ET
 from crypto.pqc_wrapper import PQCProvider
@@ -11,6 +12,8 @@ from metrics.realtime import RealtimeStats
 NS = "urn:uma:tfm:pqc:0"
 
 OUT_CSV = "artifacts/csv/sender_metrics.csv"
+
+_PROC = _psutil.Process()
 
 # Algoritmos disponibles (family, alg_name)
 _ALL_ALGS = [
@@ -69,6 +72,10 @@ class EmisorBench(slixmpp.ClientXMPP):
             "sign_time_ms",
             "rtt_ms",
             "receipt_ok",
+            "mem_rss_kb",
+            "mem_delta_kb",
+            "cpu_user_ms",
+            "cpu_sys_ms",
         ])
         self.writer.writeheader()
         self.stats = RealtimeStats(window=50)
@@ -124,8 +131,16 @@ class EmisorBench(slixmpp.ClientXMPP):
                 body = f"[{family} #{i}] Mensaje benchmark UMA"
                 body_bytes = len(body.encode("utf-8"))
 
-                # Firmar + medir sign_time_ms
+                # Firmar + medir sign_time_ms + métricas CPU/memoria
+                _t_cpu0 = _PROC.cpu_times()
+                _mem0_kb = _PROC.memory_info().rss >> 10
                 sign_res = self.pqc.sign_message(alg_name, body.encode("utf-8"))
+                _mem1_kb = _PROC.memory_info().rss >> 10
+                _t_cpu1 = _PROC.cpu_times()
+                cpu_user_ms = (_t_cpu1.user - _t_cpu0.user) * 1000.0
+                cpu_sys_ms  = (_t_cpu1.system - _t_cpu0.system) * 1000.0
+                mem_rss_kb   = _mem1_kb
+                mem_delta_kb = _mem1_kb - _mem0_kb
 
                 # Construir mensaje
                 msg = self.make_message(mto=self.recipient, mbody=body, mtype="chat")
@@ -180,6 +195,10 @@ class EmisorBench(slixmpp.ClientXMPP):
                     "sign_time_ms": sign_res.sign_time_ms,
                     "rtt_ms": rtt_ms,
                     "receipt_ok": receipt_ok,
+                    "mem_rss_kb": mem_rss_kb,
+                    "mem_delta_kb": mem_delta_kb,
+                    "cpu_user_ms": cpu_user_ms,
+                    "cpu_sys_ms": cpu_sys_ms,
                 }
                 self.writer.writerow(row)
                 self.csv_f.flush()

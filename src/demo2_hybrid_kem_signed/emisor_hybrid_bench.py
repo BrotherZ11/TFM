@@ -4,6 +4,7 @@ import csv
 import os
 import time
 from pathlib import Path
+import psutil as _psutil
 
 import slixmpp
 from slixmpp.xmlstream import ET
@@ -20,6 +21,8 @@ SIG_ALGS = [
     ("ML-DSA", "ML-DSA-65", 30),
     ("SPHINCS", "SPHINCS+-SHA2-128s-simple", 30),
 ]
+
+_PROC = _psutil.Process()
 
 
 class EmisorHybridBench(slixmpp.ClientXMPP):
@@ -91,6 +94,9 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 "verify_mode",
                 "cert_fingerprint_sha256",
                 "cert_bytes",
+                "mem_rss_kb",
+                "cpu_user_ms",
+                "cpu_sys_ms",
             ],
         )
         if not csv_exists:
@@ -248,6 +254,8 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
             for i in range(1, n + 1):
                 nonce = f"{family}-{i}-{time.time_ns()}"
 
+                _t_cpu0 = _PROC.cpu_times()
+                _mem0_kb = _PROC.memory_info().rss >> 10
                 kem = self.pqc.generate_kem_keypair(KEM_ALG)
                 sign = self.pqc.sign_with_secret_key(
                     sig_alg,
@@ -255,6 +263,11 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     identity["secret_key_b64"],
                     identity["public_key_b64"],
                 )
+                _mem1_kb = _PROC.memory_info().rss >> 10
+                _t_cpu1 = _PROC.cpu_times()
+                cpu_user_ms = (_t_cpu1.user - _t_cpu0.user) * 1000.0
+                cpu_sys_ms  = (_t_cpu1.system - _t_cpu0.system) * 1000.0
+                mem_rss_kb  = _mem1_kb
 
                 msg = self.make_message(mto=self.recipient, mbody="[HYBRID_HELLO]", mtype="chat")
                 msg["thread"] = nonce
@@ -320,6 +333,9 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     "verify_mode": self.verify_mode,
                     "cert_fingerprint_sha256": identity["cert_fingerprint"],
                     "cert_bytes": len(identity["cert_pem"].encode("utf-8")),
+                    "mem_rss_kb": mem_rss_kb,
+                    "cpu_user_ms": cpu_user_ms,
+                    "cpu_sys_ms": cpu_sys_ms,
                 }
                 self.writer.writerow(row)
                 self.csv_f.flush()

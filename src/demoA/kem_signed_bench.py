@@ -7,6 +7,7 @@ import json
 import os
 import time
 from statistics import fmean
+import psutil as _psutil
 
 from crypto.pqc_wrapper import PQCProvider
 
@@ -26,6 +27,8 @@ SIG_ALGS = [
 
 SENDER_CSV = "artifacts/csv/kem_signed_sender_metrics.csv"
 RECEIVER_CSV = "artifacts/csv/kem_signed_receiver_metrics.csv"
+
+_PROC = _psutil.Process()
 
 
 def _stable_json(payload: dict) -> bytes:
@@ -51,6 +54,9 @@ def _hello_message_to_sign(kem_alg: str, kem_pk_b64: str, nonce: str) -> bytes:
 def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: int):
     nonce = f"i{iteration}-{time.time_ns()}"
 
+    # --- lado emisor: keygen KEM + firma ---
+    _t_cpu_send0 = _PROC.cpu_times()
+    _mem_send0_kb = _PROC.memory_info().rss >> 10
     sender_total_t0 = time.perf_counter()
 
     # 1) Emisor: genera par ML-KEM efímero
@@ -73,8 +79,10 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
 
     hello_bytes = len(_stable_json(hello_packet))
 
-    # 3) Receptor: verifica firma sobre la clave KEM y encapsula secreto
+    # --- lado receptor: verificación + encapsulación ---
     receiver_total_t0 = time.perf_counter()
+    _t_cpu_recv0 = _PROC.cpu_times()
+    _mem_recv0_kb = _PROC.memory_info().rss >> 10
 
     vr = pqc.verify_signature(
         sig_alg,
@@ -101,6 +109,11 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
 
     response_bytes = len(_stable_json(response_packet))
     receiver_total_ms = (time.perf_counter() - receiver_total_t0) * 1000.0
+    _t_cpu_recv1 = _PROC.cpu_times()
+    _mem_recv1_kb = _PROC.memory_info().rss >> 10
+    cpu_recv_user_ms = (_t_cpu_recv1.user - _t_cpu_recv0.user) * 1000.0
+    cpu_recv_sys_ms  = (_t_cpu_recv1.system - _t_cpu_recv0.system) * 1000.0
+    mem_recv_rss_kb  = _mem_recv1_kb
 
     # 4) Emisor: decapsula y valida que el secreto coincide
     if verify_ok:
@@ -115,6 +128,11 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         encaps_ms = float("nan")
 
     sender_total_ms = (time.perf_counter() - sender_total_t0) * 1000.0
+    _t_cpu_send1 = _PROC.cpu_times()
+    _mem_send1_kb = _PROC.memory_info().rss >> 10
+    cpu_send_user_ms = (_t_cpu_send1.user - _t_cpu_send0.user) * 1000.0
+    cpu_send_sys_ms  = (_t_cpu_send1.system - _t_cpu_send0.system) * 1000.0
+    mem_send_rss_kb  = _mem_send1_kb
 
     sender_row = {
         "ts_unix": time.time(),
@@ -128,6 +146,9 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         "decaps_time_ms": decaps_ms,
         "sender_total_ms": sender_total_ms,
         "shared_secret_match": shared_secret_match,
+        "mem_send_rss_kb": mem_send_rss_kb,
+        "cpu_send_user_ms": cpu_send_user_ms,
+        "cpu_send_sys_ms": cpu_send_sys_ms,
     }
 
     receiver_row = {
@@ -141,6 +162,9 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         "verify_ok": verify_ok,
         "encaps_time_ms": encaps_ms,
         "receiver_total_ms": receiver_total_ms,
+        "mem_recv_rss_kb": mem_recv_rss_kb,
+        "cpu_recv_user_ms": cpu_recv_user_ms,
+        "cpu_recv_sys_ms": cpu_recv_sys_ms,
     }
 
     return sender_row, receiver_row
@@ -168,6 +192,9 @@ def run_benchmark(iterations: int):
         "decaps_time_ms",
         "sender_total_ms",
         "shared_secret_match",
+        "mem_send_rss_kb",
+        "cpu_send_user_ms",
+        "cpu_send_sys_ms",
     ]
 
     receiver_fields = [
@@ -181,6 +208,9 @@ def run_benchmark(iterations: int):
         "verify_ok",
         "encaps_time_ms",
         "receiver_total_ms",
+        "mem_recv_rss_kb",
+        "cpu_recv_user_ms",
+        "cpu_recv_sys_ms",
     ]
 
     all_sender_rows = []
