@@ -2,6 +2,7 @@ import argparse
 import base64
 import csv
 import hashlib
+import itertools
 import json
 import os
 import time
@@ -9,10 +10,18 @@ from statistics import fmean
 
 from crypto.pqc_wrapper import PQCProvider
 
-KEM_ALG = "ML-KEM-768"
+KEM_ALGS = [
+    "ML-KEM-512",
+    "ML-KEM-768",
+    "ML-KEM-1024",
+]
+
 SIG_ALGS = [
-    ("ML-DSA", "ML-DSA-65"),
-    ("SPHINCS", "SPHINCS+-SHA2-128s-simple"),
+    ("ML-DSA",   "ML-DSA-44"),
+    ("ML-DSA",   "ML-DSA-65"),
+    ("ML-DSA",   "ML-DSA-87"),
+    ("SPHINCS",  "SPHINCS+-SHA2-128s-simple"),
+    ("SPHINCS",  "SPHINCS+-SHA2-128f-simple"),
 ]
 
 SENDER_CSV = "artifacts/csv/kem_signed_sender_metrics.csv"
@@ -187,13 +196,13 @@ def run_benchmark(iterations: int):
         sender_writer.writeheader()
         receiver_writer.writeheader()
 
-        for family, sig_alg in SIG_ALGS:
-            print(f"\n== {family} + {KEM_ALG} | {iterations} iteraciones ==")
-            family_sender = []
+        for kem_alg, (family, sig_alg) in itertools.product(KEM_ALGS, SIG_ALGS):
+            print(f"\n== {kem_alg} + {sig_alg} | {iterations} iteraciones ==")
+            family_sender   = []
             family_receiver = []
 
             for i in range(1, iterations + 1):
-                s_row, r_row = run_one_handshake(pqc, sig_alg=sig_alg, kem_alg=KEM_ALG, iteration=i)
+                s_row, r_row = run_one_handshake(pqc, sig_alg=sig_alg, kem_alg=kem_alg, iteration=i)
                 sender_writer.writerow(s_row)
                 receiver_writer.writerow(r_row)
 

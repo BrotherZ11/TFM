@@ -35,6 +35,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
         ca_public_key_file: str | None,
         qr_fingerprint_output_file: str | None,
         startup_timeout_s: int = 20,
+        iterations: int = 30,
     ):
         super().__init__(jid, password)
 
@@ -56,6 +57,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
         self.ca_secret_key_file = ca_secret_key_file
         self.ca_public_key_file = ca_public_key_file
         self.qr_fingerprint_output_file = qr_fingerprint_output_file
+        self.iterations = max(1, iterations)
         self.identity_by_alg = {}
 
         self.pending = {}
@@ -239,8 +241,9 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
             self._build_identity_for_alg(sig_alg)
         self._write_qr_fingerprints()
 
-        for family, sig_alg, n in SIG_ALGS:
+        for family, sig_alg, _ in SIG_ALGS:
             identity = self._build_identity_for_alg(sig_alg)
+            n = self.iterations
             print(f"\n== {family} + {KEM_ALG} ({n} handshakes) ==")
             for i in range(1, n + 1):
                 nonce = f"{family}-{i}-{time.time_ns()}"
@@ -348,6 +351,10 @@ if __name__ == "__main__":
     parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
     parser.add_argument("--startup-timeout", type=int, default=20)
+    parser.add_argument(
+        "--iterations", type=int, default=30,
+        help="Handshakes a ejecutar por algoritmo de firma (default: 30)"
+    )
     args = parser.parse_args()
 
     bot = EmisorHybridBench(
@@ -361,6 +368,7 @@ if __name__ == "__main__":
         ca_public_key_file=args.ca_public_key_file,
         qr_fingerprint_output_file=args.qr_fingerprint_output_file,
         startup_timeout_s=args.startup_timeout,
+        iterations=args.iterations,
     )
     bot.register_plugin("xep_0030")
 

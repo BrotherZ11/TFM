@@ -11,6 +11,8 @@ LOG_DIR="$ROOT_DIR/artifacts/logs/run_all/$TIMESTAMP"
 mkdir -p "$LOG_DIR"
 
 LOCAL_ITERS="${LOCAL_ITERS:-20}"
+HYBRID_ITERS="${HYBRID_ITERS:-30}"
+COMPARISON_ITERS="${COMPARISON_ITERS:-50}"
 RUN_QR="${RUN_QR:-1}"
 XMPP_HOST="${XMPP_HOST:-127.0.0.1}"
 XMPP_PORT="${XMPP_PORT:-5222}"
@@ -20,6 +22,7 @@ TIMEOUT_DEMO2A="${TIMEOUT_DEMO2A:-240}"
 TIMEOUT_DEMO2B="${TIMEOUT_DEMO2B:-480}"
 TIMEOUT_DEMO2C="${TIMEOUT_DEMO2C:-480}"
 TIMEOUT_DEMO3="${TIMEOUT_DEMO3:-180}"
+TIMEOUT_COMPARISON="${TIMEOUT_COMPARISON:-180}"
 STARTUP_TIMEOUT_XMPP="${STARTUP_TIMEOUT_XMPP:-20}"
 READY_TIMEOUT_RECEIVER="${READY_TIMEOUT_RECEIVER:-30}"
 
@@ -157,6 +160,8 @@ main() {
   log "PYTHONUNBUFFERED=$PYTHONUNBUFFERED"
   log "LOG_DIR=$LOG_DIR"
   log "LOCAL_ITERS=$LOCAL_ITERS"
+  log "HYBRID_ITERS=$HYBRID_ITERS"
+  log "COMPARISON_ITERS=$COMPARISON_ITERS"
   log "RUN_QR=$RUN_QR"
   log "XMPP_HOST=$XMPP_HOST"
   log "XMPP_PORT=$XMPP_PORT"
@@ -198,7 +203,7 @@ main() {
 
   run_fg \
     "Demo2B emisor cert" \
-    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py' --verify-mode cert --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py' --verify-mode cert --iterations '$HYBRID_ITERS' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
     "$LOG_DIR/demo2b_emisor_cert.log" \
     "$TIMEOUT_DEMO2B"
 
@@ -213,7 +218,7 @@ main() {
 
     run_fg \
       "Demo2C emisor qr" \
-      "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py' --verify-mode qr --qr-fingerprint-output-file '$ROOT_DIR/artifacts/csv/trusted_qr_fingerprints.txt' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
+      "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py' --verify-mode qr --qr-fingerprint-output-file '$ROOT_DIR/artifacts/csv/trusted_qr_fingerprints.txt' --iterations '$HYBRID_ITERS' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
       "$LOG_DIR/demo2c_emisor_qr.log" \
       "$TIMEOUT_DEMO2C"
 
@@ -245,6 +250,30 @@ main() {
     "Demo3 summarize_experiments" \
     "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/summarize_experiments.py'" \
     "$LOG_DIR/demo3_summary.log" \
+    "$TIMEOUT_DEMO3"
+
+  run_fg \
+    "Demo3 analyze_results" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/analyze_results.py'" \
+    "$LOG_DIR/demo3_analyze_results.log" \
+    "$TIMEOUT_DEMO3"
+
+  run_fg \
+    "Demo3 analyze_pcap" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo3_analysis/analyze_pcap.py'" \
+    "$LOG_DIR/demo3_analyze_pcap.log" \
+    "$TIMEOUT_DEMO3"
+
+  run_fg \
+    "Demo3 crypto_comparison" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/crypto_comparison_bench.py' --mode all --iterations '$COMPARISON_ITERS'" \
+    "$LOG_DIR/demo3_crypto_comparison.log" \
+    "$TIMEOUT_COMPARISON"
+
+  run_fg \
+    "Demo3 plot_comparison" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/plot_comparison.py'" \
+    "$LOG_DIR/demo3_plot_comparison.log" \
     "$TIMEOUT_DEMO3"
 
   log "Ejecución completa ✅"

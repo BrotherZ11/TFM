@@ -12,15 +12,23 @@ NS = "urn:uma:tfm:pqc:0"
 
 OUT_CSV = "artifacts/csv/sender_metrics.csv"
 
-# Algoritmos a probar
-ALGS = [
-    ("ML-DSA", "ML-DSA-65", 100),
-    ("SPHINCS", "SPHINCS+-SHA2-128s-simple", 100),
+# Algoritmos disponibles (family, alg_name)
+_ALL_ALGS = [
+    ("ML-DSA",  "ML-DSA-65"),
+    ("SPHINCS", "SPHINCS+-SHA2-128s-simple"),
 ]
+
+# Mapa para filtrar por familia desde --algorithms
+_ALG_FAMILIES = {
+    "ML-DSA":   [("ML-DSA",  "ML-DSA-65")],
+    "SPHINCS":  [("SPHINCS", "SPHINCS+-SHA2-128s-simple")],
+    "all":      _ALL_ALGS,
+}
 
 
 class EmisorBench(slixmpp.ClientXMPP):
-    def __init__(self, jid, password, recipient, startup_timeout_s=20):
+    def __init__(self, jid, password, recipient, startup_timeout_s=20,
+                 algs=None, iterations=100):
         super().__init__(jid, password)
 
         self.use_tls = False
@@ -35,6 +43,8 @@ class EmisorBench(slixmpp.ClientXMPP):
         self.session_ready = False
         self.exit_code = 0
         self.pqc = PQCProvider()
+        self.algs = algs if algs is not None else _ALL_ALGS
+        self.iterations = max(1, iterations)
 
         self.pending = {}  # msg_id -> (send_time_perf, future)
 
@@ -106,7 +116,8 @@ class EmisorBench(slixmpp.ClientXMPP):
     async def run_benchmark(self):
         seq_global = 0
 
-        for family, alg_name, n in ALGS:
+        for family, alg_name in self.algs:
+            n = self.iterations
             print(f"\n== Benchmark {family}: {alg_name} ({n} mensajes) ==")
             for i in range(1, n + 1):
                 seq_global += 1
@@ -196,9 +207,22 @@ if __name__ == "__main__":
     parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
     parser.add_argument("--startup-timeout", type=int, default=20)
+    parser.add_argument(
+        "--iterations", type=int, default=100,
+        help="Mensajes a enviar por algoritmo (default: 100)"
+    )
+    parser.add_argument(
+        "--algorithms", choices=["ML-DSA", "SPHINCS", "all"], default="all",
+        help="Familia de algoritmos a ejecutar (default: all)"
+    )
     args = parser.parse_args()
 
-    bot = EmisorBench("emisor@localhost", "123", "receptor@localhost", startup_timeout_s=args.startup_timeout)
+    bot = EmisorBench(
+        "emisor@localhost", "123", "receptor@localhost",
+        startup_timeout_s=args.startup_timeout,
+        algs=_ALG_FAMILIES[args.algorithms],
+        iterations=args.iterations,
+    )
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 
