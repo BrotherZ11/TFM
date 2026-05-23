@@ -6,3 +6,5 @@ scipy
 cryptography
 scapy
 psutil
+streamlit
+qrcode[pil]
