@@ -177,12 +177,12 @@ main() {
   # Demo 1: firmas PQC en XMPP
   run_bg_receiver \
     "Demo1 receptor" \
-    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demoA/receptor_bench.py' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo1_signatures_xmpp/receptor_bench.py' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
     "$LOG_DIR/demo1_receptor.log"
 
   run_fg \
     "Demo1 emisor" \
-    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demoA/emisor_bench.py' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo1_signatures_xmpp/emisor_bench.py' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
     "$LOG_DIR/demo1_emisor.log" \
     "$TIMEOUT_DEMO1"
 
@@ -191,7 +191,7 @@ main() {
   # Demo 2A: handshake híbrido local
   run_fg \
     "Demo2A local" \
-    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demoA/kem_signed_bench.py' --iterations '$LOCAL_ITERS'" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/kem_signed_bench.py' --iterations '$LOCAL_ITERS'" \
     "$LOG_DIR/demo2a_local.log" \
     "$TIMEOUT_DEMO2A"
 

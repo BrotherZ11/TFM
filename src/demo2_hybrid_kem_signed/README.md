@@ -5,10 +5,10 @@ Objetivo: establecer una clave simétrica usando `ML-KEM-768`, autenticando la c
 ## Variante A: benchmark local (sin red)
 
 Script:
-- `src/demoA/kem_signed_bench.py`
+- `src/demo2_hybrid_kem_signed/kem_signed_bench.py`
 
 Ejecución:
-- `PYTHONPATH=src venv/bin/python src/demoA/kem_signed_bench.py --iterations 20`
+- `PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/kem_signed_bench.py --iterations 20`
 
 CSV:
 - `artifacts/csv/kem_signed_sender_metrics.csv`

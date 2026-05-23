@@ -15,11 +15,11 @@ Este repositorio implementa y evalúa experimentalmente mensajería XMPP con PQC
 
 Implementación principal reutilizable:
 - `src/crypto/pqc_wrapper.py`
-- `src/demoA/emisor.py`
-- `src/demoA/receptor.py`
-- `src/demoA/emisor_bench.py`
-- `src/demoA/receptor_bench.py`
-- `src/demoA/kem_signed_bench.py`
+- `src/demo1_signatures_xmpp/emisor.py`
+- `src/demo1_signatures_xmpp/receptor.py`
+- `src/demo1_signatures_xmpp/emisor_bench.py`
+- `src/demo1_signatures_xmpp/receptor_bench.py`
+- `src/demo2_hybrid_kem_signed/kem_signed_bench.py`
 - `src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py`
 - `src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py`
 - `src/demo2_hybrid_kem_signed/pqc_pki_tool.py`
@@ -47,13 +47,13 @@ pip install -r requirements.txt
 Receptor:
 
 ```bash
-PYTHONPATH=src venv/bin/python src/demoA/receptor_bench.py
+PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/receptor_bench.py
 ```
 
 Emisor:
 
 ```bash
-PYTHONPATH=src venv/bin/python src/demoA/emisor_bench.py
+PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/emisor_bench.py
 ```
 
 Salida:
@@ -63,7 +63,7 @@ Salida:
 ## Demo 2: handshake híbrido firmado (ML-KEM + ML-DSA/SPHINCS)
 
 ```bash
-PYTHONPATH=src venv/bin/python src/demoA/kem_signed_bench.py --iterations 20
+PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/kem_signed_bench.py --iterations 20
 ```
 
 Salida:

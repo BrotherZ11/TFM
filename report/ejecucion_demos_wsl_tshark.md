@@ -42,7 +42,7 @@ sudo tshark -i any -f "tcp port 5222" -w artifacts/pcap/demo1_signatures_xmpp.pc
 ```bash
 cd /home/david/TFM
 source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/demoA/receptor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
+PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/receptor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
 
 ### Terminal C — Emisor
@@ -50,7 +50,7 @@ PYTHONPATH=src venv/bin/python src/demoA/receptor_bench.py --host 127.0.0.1 --po
 ```bash
 cd /home/david/TFM
 source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/demoA/emisor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
+PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/emisor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
 
 ### Parar captura
@@ -68,7 +68,7 @@ Este benchmark es local (sin XMPP), por lo que no hay tráfico de aplicación en
 ```bash
 cd /home/david/TFM
 source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/demoA/kem_signed_bench.py --iterations 20
+PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/kem_signed_bench.py --iterations 20
 ```
 
 ### Captura tshark (opcional, esperable casi vacía)
