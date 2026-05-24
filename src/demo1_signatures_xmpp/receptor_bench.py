@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import time
+import psutil as _psutil
 import slixmpp
 from slixmpp.xmlstream import ET
 from crypto.pqc_wrapper import PQCProvider
@@ -10,6 +11,8 @@ from metrics.realtime import RealtimeStats
 NS = "urn:uma:tfm:pqc:0"
 
 OUT_CSV = "artifacts/csv/receiver_metrics.csv"
+
+_PROC = _psutil.Process()
 
 
 class ReceptorBench(slixmpp.ClientXMPP):
@@ -46,8 +49,12 @@ class ReceptorBench(slixmpp.ClientXMPP):
             "body_bytes",
             "pk_b64_bytes",
             "sig_b64_bytes",
+            "deserialize_time_ms",
             "verify_time_ms",
             "verify_ok",
+            "cpu_user_ms",
+            "cpu_sys_ms",
+            "mem_rss_kb",
         ])
         self.writer.writeheader()
         self.stats = RealtimeStats(window=50)
@@ -87,7 +94,8 @@ class ReceptorBench(slixmpp.ClientXMPP):
         body = msg["body"] or ""
         body_bytes = len(body.encode("utf-8"))
 
-        # Extraer PQC
+        # Extraer PQC (medir tiempo de deserialización)
+        _t0_deser = time.perf_counter()
         pqc = msg.xml.find(f"{{{NS}}}pqc_auth")
         if pqc is None:
             # Aun así, si el emisor pidió receipt, respondemos:
@@ -99,9 +107,17 @@ class ReceptorBench(slixmpp.ClientXMPP):
         pk_el = pqc.find(f"{{{NS}}}pk")
         sig_b64 = (sig_el.text or "").strip() if sig_el is not None else ""
         pk_b64 = (pk_el.text or "").strip() if pk_el is not None else ""
+        deserialize_time_ms = (time.perf_counter() - _t0_deser) * 1000.0
 
-        # Verificación
+        # Verificación con métricas CPU/memoria
+        _t_cpu0 = _PROC.cpu_times()
+        _mem0_kb = _PROC.memory_info().rss >> 10
         vr = self.pqc.verify_signature(alg, body.encode("utf-8"), sig_b64, pk_b64)
+        _mem1_kb = _PROC.memory_info().rss >> 10
+        _t_cpu1 = _PROC.cpu_times()
+        cpu_user_ms = (_t_cpu1.user - _t_cpu0.user) * 1000.0
+        cpu_sys_ms  = (_t_cpu1.system - _t_cpu0.system) * 1000.0
+        mem_rss_kb  = _mem1_kb
 
         # Log
         row = {
@@ -113,8 +129,12 @@ class ReceptorBench(slixmpp.ClientXMPP):
             "body_bytes": body_bytes,
             "pk_b64_bytes": len(pk_b64.encode("ascii")),
             "sig_b64_bytes": len(sig_b64.encode("ascii")),
+            "deserialize_time_ms": deserialize_time_ms,
             "verify_time_ms": vr.verify_time_ms,
             "verify_ok": int(bool(vr.ok)),
+            "cpu_user_ms": cpu_user_ms,
+            "cpu_sys_ms": cpu_sys_ms,
+            "mem_rss_kb": mem_rss_kb,
         }
         self.writer.writerow(row)
         self.csv_f.flush()

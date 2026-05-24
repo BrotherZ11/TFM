@@ -62,9 +62,11 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
     # 1) Emisor: genera par ML-KEM efímero
     kem_kp = pqc.generate_kem_keypair(kem_alg)
 
-    # 2) Emisor: firma su clave pública KEM
+    # 2) Emisor: genera keypair de firma y firma su clave pública KEM
     hello_msg = _hello_message_to_sign(kem_alg, kem_kp.public_key_b64, nonce)
-    sign_res = pqc.sign_message(sig_alg, hello_msg)
+    sig_kp = pqc.generate_signature_keypair(sig_alg)
+    sign_res = pqc.sign_with_secret_key(sig_alg, hello_msg, sig_kp.secret_key_b64, sig_kp.public_key_b64)
+    sig_keygen_time_ms = sig_kp.keygen_time_ms
 
     hello_packet = {
         "type": "hello",
@@ -74,10 +76,11 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         "nonce": nonce,
         "kem_pk_b64": kem_kp.public_key_b64,
         "sig_b64": sign_res.sig_b64,
-        "sig_pk_b64": sign_res.pk_b64,
+        "sig_pk_b64": sig_kp.public_key_b64,
     }
 
     hello_bytes = len(_stable_json(hello_packet))
+    kem_pk_bytes = len(base64.b64decode(kem_kp.public_key_b64))
 
     # --- lado receptor: verificación + encapsulación ---
     receiver_total_t0 = time.perf_counter()
@@ -108,6 +111,7 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
     }
 
     response_bytes = len(_stable_json(response_packet))
+    kem_ct_bytes = len(base64.b64decode(enc_res.ciphertext_b64)) if enc_res else 0
     receiver_total_ms = (time.perf_counter() - receiver_total_t0) * 1000.0
     _t_cpu_recv1 = _PROC.cpu_times()
     _mem_recv1_kb = _PROC.memory_info().rss >> 10
@@ -142,10 +146,12 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         "hello_bytes": hello_bytes,
         "response_bytes": response_bytes,
         "kem_keygen_ms": kem_kp.keygen_time_ms,
+        "sig_keygen_ms": sig_keygen_time_ms,
         "sign_time_ms": sign_res.sign_time_ms,
         "decaps_time_ms": decaps_ms,
         "sender_total_ms": sender_total_ms,
         "shared_secret_match": shared_secret_match,
+        "kem_pk_bytes": kem_pk_bytes,
         "mem_send_rss_kb": mem_send_rss_kb,
         "cpu_send_user_ms": cpu_send_user_ms,
         "cpu_send_sys_ms": cpu_send_sys_ms,
@@ -162,6 +168,8 @@ def run_one_handshake(pqc: PQCProvider, sig_alg: str, kem_alg: str, iteration: i
         "verify_ok": verify_ok,
         "encaps_time_ms": encaps_ms,
         "receiver_total_ms": receiver_total_ms,
+        "kem_pk_bytes": kem_pk_bytes,
+        "kem_ct_bytes": kem_ct_bytes,
         "mem_recv_rss_kb": mem_recv_rss_kb,
         "cpu_recv_user_ms": cpu_recv_user_ms,
         "cpu_recv_sys_ms": cpu_recv_sys_ms,
@@ -188,10 +196,12 @@ def run_benchmark(iterations: int):
         "hello_bytes",
         "response_bytes",
         "kem_keygen_ms",
+        "sig_keygen_ms",
         "sign_time_ms",
         "decaps_time_ms",
         "sender_total_ms",
         "shared_secret_match",
+        "kem_pk_bytes",
         "mem_send_rss_kb",
         "cpu_send_user_ms",
         "cpu_send_sys_ms",
@@ -208,6 +218,8 @@ def run_benchmark(iterations: int):
         "verify_ok",
         "encaps_time_ms",
         "receiver_total_ms",
+        "kem_pk_bytes",
+        "kem_ct_bytes",
         "mem_recv_rss_kb",
         "cpu_recv_user_ms",
         "cpu_recv_sys_ms",

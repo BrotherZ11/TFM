@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import base64
 import csv
 import os
 import time
@@ -87,13 +88,17 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 "response_stanza_bytes",
                 "kem_keygen_time_ms",
                 "sign_time_ms",
+                "serialize_time_ms",
                 "decaps_time_ms",
                 "rtt_ms",
+                "sender_total_ms",
                 "shared_secret_match",
                 "ok",
                 "verify_mode",
                 "cert_fingerprint_sha256",
                 "cert_bytes",
+                "kem_pk_bytes",
+                "kem_ct_bytes",
                 "mem_rss_kb",
                 "cpu_user_ms",
                 "cpu_sys_ms",
@@ -172,6 +177,8 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
         await self.run_benchmark()
         self.exit_code = 0
         self.disconnect()
+        await asyncio.sleep(0.5)
+        asyncio.get_event_loop().stop()
 
     def on_failed_auth(self, _):
         if not self.session_ready:
@@ -219,6 +226,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
         ok = 0
         decaps_ms = float("nan")
         shared_secret_match = 0
+        kem_ct_bytes = 0
 
         try:
             dec = self.pqc.decapsulate_secret(
@@ -228,8 +236,11 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
             own_hash = sha256_hex_from_b64(dec.shared_secret_b64)
             shared_secret_match = int(own_hash == peer_hash)
             ok = int(shared_secret_match == 1)
+            kem_ct_bytes = len(base64.b64decode(ciphertext_b64)) if ciphertext_b64 else 0
         except Exception:
             ok = 0
+
+        sender_total_ms = (time.perf_counter() - rec["t_total_start"]) * 1000.0
 
         if not rec["future"].done():
             rec["future"].set_result(
@@ -239,6 +250,8 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     "decaps_time_ms": decaps_ms,
                     "shared_secret_match": shared_secret_match,
                     "ok": ok,
+                    "sender_total_ms": sender_total_ms,
+                    "kem_ct_bytes": kem_ct_bytes,
                 }
             )
 
@@ -254,6 +267,7 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
             for i in range(1, n + 1):
                 nonce = f"{family}-{i}-{time.time_ns()}"
 
+                t_total_start = time.perf_counter()
                 _t_cpu0 = _PROC.cpu_times()
                 _mem0_kb = _PROC.memory_info().rss >> 10
                 kem = self.pqc.generate_kem_keypair(KEM_ALG)
@@ -269,6 +283,10 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 cpu_sys_ms  = (_t_cpu1.system - _t_cpu0.system) * 1000.0
                 mem_rss_kb  = _mem1_kb
 
+                kem_pk_bytes = len(base64.b64decode(kem.public_key_b64))
+
+                # Serializar stanza hello con todos los campos PQC
+                _t0_ser = time.perf_counter()
                 msg = self.make_message(mto=self.recipient, mbody="[HYBRID_HELLO]", mtype="chat")
                 msg["thread"] = nonce
 
@@ -292,13 +310,16 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                 msg.xml.append(hello)
 
                 hello_stanza_bytes = len(ET.tostring(msg.xml, encoding="utf-8"))
+                serialize_time_ms = (time.perf_counter() - _t0_ser) * 1000.0
 
                 fut = asyncio.get_event_loop().create_future()
                 self.pending[nonce] = {
                     "future": fut,
                     "send_t0": time.perf_counter(),
+                    "t_total_start": t_total_start,
                     "kem_alg": KEM_ALG,
                     "kem_secret_key_b64": kem.secret_key_b64,
+                    "kem_pk_bytes": kem_pk_bytes,
                 }
 
                 msg.send()
@@ -309,6 +330,8 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     "decaps_time_ms": float("nan"),
                     "shared_secret_match": 0,
                     "ok": 0,
+                    "sender_total_ms": float("nan"),
+                    "kem_ct_bytes": 0,
                 }
                 try:
                     result = await asyncio.wait_for(fut, timeout=10.0)
@@ -326,13 +349,17 @@ class EmisorHybridBench(slixmpp.ClientXMPP):
                     "response_stanza_bytes": result["response_stanza_bytes"],
                     "kem_keygen_time_ms": kem.keygen_time_ms,
                     "sign_time_ms": sign.sign_time_ms,
+                    "serialize_time_ms": serialize_time_ms,
                     "decaps_time_ms": result["decaps_time_ms"],
                     "rtt_ms": result["rtt_ms"],
+                    "sender_total_ms": result["sender_total_ms"],
                     "shared_secret_match": result["shared_secret_match"],
                     "ok": result["ok"],
                     "verify_mode": self.verify_mode,
                     "cert_fingerprint_sha256": identity["cert_fingerprint"],
                     "cert_bytes": len(identity["cert_pem"].encode("utf-8")),
+                    "kem_pk_bytes": kem_pk_bytes,
+                    "kem_ct_bytes": result["kem_ct_bytes"],
                     "mem_rss_kb": mem_rss_kb,
                     "cpu_user_ms": cpu_user_ms,
                     "cpu_sys_ms": cpu_sys_ms,

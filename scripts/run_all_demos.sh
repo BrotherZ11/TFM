@@ -27,11 +27,16 @@ STARTUP_TIMEOUT_XMPP="${STARTUP_TIMEOUT_XMPP:-20}"
 READY_TIMEOUT_RECEIVER="${READY_TIMEOUT_RECEIVER:-30}"
 
 RECEIVER_PID=""
+CAPTURE_PID=""
 
 cleanup() {
   if [[ -n "${RECEIVER_PID}" ]] && kill -0 "$RECEIVER_PID" 2>/dev/null; then
     kill "$RECEIVER_PID" || true
     wait "$RECEIVER_PID" 2>/dev/null || true
+  fi
+  if [[ -n "${CAPTURE_PID}" ]] && kill -0 "$CAPTURE_PID" 2>/dev/null; then
+    kill -SIGINT "$CAPTURE_PID" || true
+    wait "$CAPTURE_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -77,6 +82,28 @@ require_file() {
     echo "ERROR: no existe archivo requerido: $1" >&2
     exit 1
   }
+}
+
+start_capture() {
+  local pcap_file="$1"
+  local filter="${2:-tcp port 5222}"
+  log "Iniciando captura pcap: $(basename "$pcap_file")"
+  tshark -i lo -f "$filter" -w "$pcap_file" > /dev/null 2>&1 &
+  CAPTURE_PID=$!
+  sleep 1
+  if ! kill -0 "$CAPTURE_PID" 2>/dev/null; then
+    echo "WARN: tshark no arrancó, continuando sin captura pcap" >&2
+    CAPTURE_PID=""
+  fi
+}
+
+stop_capture() {
+  if [[ -n "${CAPTURE_PID}" ]] && kill -0 "$CAPTURE_PID" 2>/dev/null; then
+    log "Parando captura pcap (PID=$CAPTURE_PID)"
+    kill -SIGINT "$CAPTURE_PID" || true
+    wait "$CAPTURE_PID" 2>/dev/null || true
+  fi
+  CAPTURE_PID=""
 }
 
 run_bg_receiver() {
@@ -171,10 +198,15 @@ main() {
   # Limpieza de huellas QR previas
   rm -f "$ROOT_DIR/artifacts/csv/trusted_qr_fingerprints.txt"
 
+  # Limpiar CSVs en modo append (acumulan datos de esquemas distintos entre ejecuciones)
+  rm -f "$ROOT_DIR/artifacts/csv/hybrid_xmpp_sender_metrics.csv"
+  rm -f "$ROOT_DIR/artifacts/csv/hybrid_xmpp_receiver_metrics.csv"
+
   # Preflight XMPP para evitar bloqueos silenciosos
   check_xmpp_connectivity "$XMPP_HOST" "$XMPP_PORT"
 
   # Demo 1: firmas PQC en XMPP
+  start_capture "$ROOT_DIR/artifacts/pcap/demo1_signatures_xmpp.pcapng"
   run_bg_receiver \
     "Demo1 receptor" \
     "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo1_signatures_xmpp/receptor_bench.py' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
@@ -187,6 +219,7 @@ main() {
     "$TIMEOUT_DEMO1"
 
   stop_receiver
+  stop_capture
 
   # Demo 2A: handshake híbrido local
   run_fg \
@@ -196,6 +229,7 @@ main() {
     "$TIMEOUT_DEMO2A"
 
   # Demo 2B: handshake híbrido XMPP (cert)
+  start_capture "$ROOT_DIR/artifacts/pcap/demo2b_hybrid_xmpp_cert.pcapng"
   run_bg_receiver \
     "Demo2B receptor cert" \
     "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py' --verify-mode cert --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
@@ -208,9 +242,11 @@ main() {
     "$TIMEOUT_DEMO2B"
 
   stop_receiver
+  stop_capture
 
   # Demo 2C: handshake híbrido XMPP (qr)
   if [[ "$RUN_QR" == "1" ]]; then
+    start_capture "$ROOT_DIR/artifacts/pcap/demo2c_hybrid_xmpp_qr.pcapng"
     run_bg_receiver \
       "Demo2C receptor qr" \
       "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py' --verify-mode qr --trusted-fingerprints-file '$ROOT_DIR/artifacts/csv/trusted_qr_fingerprints.txt' --host '$XMPP_HOST' --port '$XMPP_PORT' --startup-timeout '$STARTUP_TIMEOUT_XMPP'" \
@@ -223,6 +259,7 @@ main() {
       "$TIMEOUT_DEMO2C"
 
     stop_receiver
+    stop_capture
   else
     log "RUN_QR=0, saltando Demo2C QR"
   fi
@@ -274,6 +311,12 @@ main() {
     "Demo3 plot_comparison" \
     "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/plot_comparison.py'" \
     "$LOG_DIR/demo3_plot_comparison.log" \
+    "$TIMEOUT_DEMO3"
+
+  run_fg \
+    "Demo3 generate_results_doc" \
+    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/generate_results_doc.py'" \
+    "$LOG_DIR/demo3_results_doc.log" \
     "$TIMEOUT_DEMO3"
 
   log "Ejecución completa ✅"

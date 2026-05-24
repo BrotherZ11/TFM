@@ -1,8 +1,10 @@
+import base64
 import csv
 import argparse
 import os
 import time
 from pathlib import Path
+import psutil as _psutil
 
 import slixmpp
 from slixmpp.xmlstream import ET
@@ -13,6 +15,8 @@ from metrics.realtime import RealtimeStats
 from demo2_hybrid_kem_signed.protocol import NS_HYBRID, hello_message_to_sign, sha256_hex_from_b64, load_trusted_values
 
 OUT_CSV = "artifacts/csv/hybrid_xmpp_receiver_metrics.csv"
+
+_PROC = _psutil.Process()
 
 
 class ReceptorHybridBench(slixmpp.ClientXMPP):
@@ -64,6 +68,7 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
                 "sig_alg",
                 "hello_stanza_bytes",
                 "response_stanza_bytes",
+                "deserialize_time_ms",
                 "verify_time_ms",
                 "verify_ok",
                 "cert_ok",
@@ -71,6 +76,11 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
                 "cert_fingerprint_sha256",
                 "encaps_time_ms",
                 "receiver_total_ms",
+                "cpu_user_ms",
+                "cpu_sys_ms",
+                "mem_rss_kb",
+                "kem_pk_bytes",
+                "kem_ct_bytes",
             ],
         )
         if not csv_exists:
@@ -118,6 +128,8 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
 
         t0 = time.perf_counter()
 
+        # Deserialización: extraer todos los campos del stanza
+        _t0_deser = time.perf_counter()
         kem_alg = hello.get("kem_alg") or ""
         sig_alg = hello.get("sig_alg") or ""
         nonce = hello.get("nonce") or ""
@@ -135,6 +147,7 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
         cert_fingerprint_claim = (cert_fp_el.text or "").strip() if cert_fp_el is not None else ""
 
         hello_stanza_bytes = len(ET.tostring(msg.xml, encoding="utf-8"))
+        deserialize_time_ms = (time.perf_counter() - _t0_deser) * 1000.0
 
         if not (kem_alg and sig_alg and nonce and kem_pk_b64 and sig_b64 and cert_pem and cert_fingerprint_claim):
             return
@@ -164,10 +177,16 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
         verify_ok = int(bool(vr.ok and cert_ok))
         enc_ms = float("nan")
         response_stanza_bytes = 0
+        kem_ct_bytes = 0
+
+        # Métricas CPU/memoria sobre el bloque crítico (verify + encaps)
+        _t_cpu0 = _PROC.cpu_times()
+        _mem0_kb = _PROC.memory_info().rss >> 10
 
         if verify_ok:
             enc = self.pqc.encapsulate_secret(kem_alg, kem_pk_b64)
             enc_ms = enc.encaps_time_ms
+            kem_ct_bytes = len(base64.b64decode(enc.ciphertext_b64))
 
             response = self.make_message(mto=msg["from"], mbody="[HYBRID_RESPONSE]", mtype="chat")
             response["thread"] = nonce
@@ -186,6 +205,14 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
             response_stanza_bytes = len(ET.tostring(response.xml, encoding="utf-8"))
             response.send()
 
+        _mem1_kb = _PROC.memory_info().rss >> 10
+        _t_cpu1 = _PROC.cpu_times()
+        cpu_user_ms = (_t_cpu1.user - _t_cpu0.user) * 1000.0
+        cpu_sys_ms  = (_t_cpu1.system - _t_cpu0.system) * 1000.0
+        mem_rss_kb  = _mem1_kb
+
+        kem_pk_bytes = len(base64.b64decode(kem_pk_b64)) if kem_pk_b64 else 0
+
         receiver_total_ms = (time.perf_counter() - t0) * 1000.0
 
         row = {
@@ -197,6 +224,7 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
             "sig_alg": sig_alg,
             "hello_stanza_bytes": hello_stanza_bytes,
             "response_stanza_bytes": response_stanza_bytes,
+            "deserialize_time_ms": deserialize_time_ms,
             "verify_time_ms": vr.verify_time_ms,
             "verify_ok": verify_ok,
             "cert_ok": cert_ok,
@@ -204,6 +232,11 @@ class ReceptorHybridBench(slixmpp.ClientXMPP):
             "cert_fingerprint_sha256": cert_check.fingerprint_sha256,
             "encaps_time_ms": enc_ms,
             "receiver_total_ms": receiver_total_ms,
+            "cpu_user_ms": cpu_user_ms,
+            "cpu_sys_ms": cpu_sys_ms,
+            "mem_rss_kb": mem_rss_kb,
+            "kem_pk_bytes": kem_pk_bytes,
+            "kem_ct_bytes": kem_ct_bytes,
         }
         self.writer.writerow(row)
         self.csv_f.flush()

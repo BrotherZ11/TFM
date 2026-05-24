@@ -50,6 +50,7 @@ class EmisorBench(slixmpp.ClientXMPP):
         self.iterations = max(1, iterations)
 
         self.pending = {}  # msg_id -> (send_time_perf, future)
+        self.net_baseline_rtt_ms = float("nan")
 
         self.add_event_handler("session_start", self.start)
         self.add_event_handler("receipt_received", self.on_receipt)
@@ -69,8 +70,11 @@ class EmisorBench(slixmpp.ClientXMPP):
             "stanza_bytes",
             "pk_b64_bytes",
             "sig_b64_bytes",
+            "sig_keygen_time_ms",
             "sign_time_ms",
+            "serialize_time_ms",
             "rtt_ms",
+            "net_baseline_rtt_ms",
             "receipt_ok",
             "mem_rss_kb",
             "mem_delta_kb",
@@ -87,9 +91,14 @@ class EmisorBench(slixmpp.ClientXMPP):
         await asyncio.sleep(0.2)
 
         print("EmisorBench listo. Guardando en:", OUT_CSV)
+        self.net_baseline_rtt_ms = await self._measure_baseline_rtt(n=5)
+        print(f"Baseline RTT (sin PQC): {self.net_baseline_rtt_ms:.2f} ms")
         await self.run_benchmark()
         self.exit_code = 0
         self.disconnect()
+        # Dar tiempo a slixmpp para cerrar el stream y luego forzar parada
+        await asyncio.sleep(0.5)
+        asyncio.get_event_loop().stop()
 
     def on_failed_auth(self, _):
         if not self.session_ready:
@@ -120,6 +129,25 @@ class EmisorBench(slixmpp.ClientXMPP):
             if not fut.done():
                 fut.set_result(rtt_ms)
 
+    async def _measure_baseline_rtt(self, n: int = 5) -> float:
+        """Mide el RTT de mensajes XMPP sin PQC (referencia de latencia de red)."""
+        rtts = []
+        for _ in range(n):
+            msg = self.make_message(mto=self.recipient, mbody="__baseline__", mtype="chat")
+            msg_id = msg["id"] = self.new_id()
+            msg["request_receipt"] = True
+            fut = asyncio.get_event_loop().create_future()
+            t_send = time.perf_counter()
+            self.pending[msg_id] = (t_send, fut)
+            msg.send()
+            try:
+                rtt = await asyncio.wait_for(fut, timeout=5.0)
+                rtts.append(rtt)
+            except asyncio.TimeoutError:
+                self.pending.pop(msg_id, None)
+            await asyncio.sleep(0.05)
+        return sum(rtts) / len(rtts) if rtts else float("nan")
+
     async def run_benchmark(self):
         seq_global = 0
 
@@ -131,10 +159,16 @@ class EmisorBench(slixmpp.ClientXMPP):
                 body = f"[{family} #{i}] Mensaje benchmark UMA"
                 body_bytes = len(body.encode("utf-8"))
 
-                # Firmar + medir sign_time_ms + métricas CPU/memoria
+                # Keygen + firma separados para medir ambos tiempos
                 _t_cpu0 = _PROC.cpu_times()
                 _mem0_kb = _PROC.memory_info().rss >> 10
-                sign_res = self.pqc.sign_message(alg_name, body.encode("utf-8"))
+                kp = self.pqc.generate_signature_keypair(alg_name)
+                sign_res = self.pqc.sign_with_secret_key(
+                    alg_name,
+                    body.encode("utf-8"),
+                    kp.secret_key_b64,
+                    kp.public_key_b64,
+                )
                 _mem1_kb = _PROC.memory_info().rss >> 10
                 _t_cpu1 = _PROC.cpu_times()
                 cpu_user_ms = (_t_cpu1.user - _t_cpu0.user) * 1000.0
@@ -142,14 +176,12 @@ class EmisorBench(slixmpp.ClientXMPP):
                 mem_rss_kb   = _mem1_kb
                 mem_delta_kb = _mem1_kb - _mem0_kb
 
-                # Construir mensaje
+                # Serializar stanza con campos PQC (medir tiempo)
+                _t0_ser = time.perf_counter()
                 msg = self.make_message(mto=self.recipient, mbody=body, mtype="chat")
                 msg_id = msg["id"] = self.new_id()
-
-                # Pedir delivery receipt (para RTT)
                 msg["request_receipt"] = True
 
-                # Añadir PQC XML como hijos (robusto)
                 pqc_tag = ET.Element(f"{{{NS}}}pqc_auth")
                 pqc_tag.set("alg", alg_name)
 
@@ -157,12 +189,14 @@ class EmisorBench(slixmpp.ClientXMPP):
                 sig_el.text = sign_res.sig_b64
 
                 pk_el = ET.SubElement(pqc_tag, f"{{{NS}}}pk")
-                pk_el.text = sign_res.pk_b64
+                pk_el.text = kp.public_key_b64
 
                 msg.xml.append(pqc_tag)
 
                 stanza_bytes = len(ET.tostring(msg.xml, encoding="utf-8"))
-                pk_b64_bytes = len(sign_res.pk_b64.encode("ascii"))
+                serialize_time_ms = (time.perf_counter() - _t0_ser) * 1000.0
+
+                pk_b64_bytes = len(kp.public_key_b64.encode("ascii"))
                 sig_b64_bytes = len(sign_res.sig_b64.encode("ascii"))
 
                 # Enviar y esperar receipt con timeout
@@ -192,8 +226,11 @@ class EmisorBench(slixmpp.ClientXMPP):
                     "stanza_bytes": stanza_bytes,
                     "pk_b64_bytes": pk_b64_bytes,
                     "sig_b64_bytes": sig_b64_bytes,
+                    "sig_keygen_time_ms": kp.keygen_time_ms,
                     "sign_time_ms": sign_res.sign_time_ms,
+                    "serialize_time_ms": serialize_time_ms,
                     "rtt_ms": rtt_ms,
+                    "net_baseline_rtt_ms": self.net_baseline_rtt_ms,
                     "receipt_ok": receipt_ok,
                     "mem_rss_kb": mem_rss_kb,
                     "mem_delta_kb": mem_delta_kb,
