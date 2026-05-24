@@ -18,6 +18,29 @@ sudo apt update
 sudo apt install -y tshark
 ```
 
+---
+
+## Dashboard Streamlit — Demo en vivo para la defensa
+
+No requiere servidor XMPP. Una sola terminal:
+
+```bash
+cd /home/david/TFM
+source venv/bin/activate
+PYTHONPATH=src streamlit run src/demo_live/app.py --server.address 0.0.0.0
+```
+
+Abre `http://localhost:8501` en el navegador.
+
+Para que el tribunal acceda al chat QR desde su móvil (misma red WiFi):
+- La IP del portátil se detecta automáticamente.
+- En WSL2, puede ser necesario reenviar el puerto desde Windows:
+  ```powershell
+  netsh interface portproxy add v4tov4 listenport=8501 listenaddress=0.0.0.0 connectport=8501 connectaddress=<IP-WSL>
+  ```
+
+---
+
 Crear carpeta de capturas:
 
 ```bash

@@ -34,11 +34,11 @@ Explica esto en 1 minuto:
 
 Explica esto en 2 a 3 minutos:
 
-- Demo 1: firma y verificación de stanzas XMPP con ML-DSA y SPHINCS+.
+- Demo 1: firma y verificación de stanzas XMPP con ML-DSA y SPHINCS+, con métricas de CPU y memoria.
 - Demo 2A: handshake híbrido local con ML-KEM autenticado mediante firma PQC.
 - Demo 2B: handshake híbrido real sobre XMPP con verificación por certificado X.509.
 - Demo 2C: variante de confianza por huella, simulando validación por QR.
-- Demo 3: análisis de métricas, gráficas y comparación estadística.
+- Dashboard Streamlit interactivo para la defensa: firma en vivo, handshake animado y chat del jurado.
 
 ### Bloque 3. Cómo está organizado el sistema
 
@@ -71,68 +71,63 @@ Explica esto en 3 a 4 minutos:
 
 Cierra con espíritu crítico:
 
-- Persistencia de identidades y claves en lugar de regenerarlas en escenarios de benchmark.
+- Persistencia de identidades y claves entre ejecuciones para aproximar un sistema real.
 - Integración PKI PQC más estándar con toolchain OpenSSL + oqs-provider.
 - Más repeticiones controladas y mejor aislamiento experimental.
-- Comparación con baseline clásico para cuantificar el sobrecoste PQC frente a esquemas no PQC.
-- Automatización más robusta del entorno XMPP para facilitar reproducibilidad completa.
+- Despliegue con TLS en el stack XMPP para acercarse a producción.
+- Separar mejor el coste de serialización, red y criptografía en el análisis.
 
 ## 4. Qué enseñar exactamente en pantalla
 
 Secuencia recomendada:
 
-1. README principal para situar el repositorio.
-2. scripts/run_all_demos.sh para mostrar que el flujo completo está automatizado.
-3. src/crypto/pqc_wrapper.py para explicar la abstracción criptográfica reutilizable.
-4. src/demo2_hybrid_kem_signed/protocol.py para explicar el mensaje HELLO firmado y el secreto compartido.
-5. Ejecución en terminal de la demo elegida.
-6. artifacts/csv/summary_experiments.csv para enseñar resultados tabulados.
-7. artifacts/csv/statistical_analysis.csv para justificar que no es una observación anecdótica.
-8. artifacts/figs/hybrid_xmpp_box_sign_ms.png y artifacts/figs/hybrid_xmpp_box_rtt_ms.png para cerrar visualmente.
+1. README principal para situar el repositorio y la estructura.
+2. `src/crypto/pqc_wrapper.py` para explicar la abstracción criptográfica reutilizable.
+3. `src/demo2_hybrid_kem_signed/protocol.py` para explicar el mensaje HELLO firmado y el secreto compartido.
+4. Dashboard Streamlit (`src/demo_live/app.py`) — enseñar firma en vivo, handshake animado y chat del jurado.
+5. `scripts/run_all_demos.sh` para mostrar que el flujo completo está automatizado.
 
 ## 5. Demo recomendada en vivo
 
-## Opción preferida: Demo 2B en modo cert
+## Opción preferida: Dashboard Streamlit
 
-Es la mejor para enseñar valor técnico porque combina:
+Es la mejor para enseñar valor técnico porque:
 
-- transporte XMPP real,
-- autenticación,
-- certificado X.509 real con extensiones privadas PQC,
-- ML-KEM para acuerdo de clave,
-- y métricas medibles.
-
-### Terminal 1
+- no requiere terminales adicionales ni servidor XMPP,
+- el tribunal puede participar directamente (chat QR),
+- muestra métricas reales en tiempo real,
+- y permite comparar ML-DSA vs SPHINCS+ sin preparación previa.
 
 ```bash
 cd /home/david/TFM
 source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
+PYTHONPATH=src streamlit run src/demo_live/app.py --server.address 0.0.0.0
+```
+
+Abre `http://localhost:8501`. Navega por las 3 pestañas:
+- **Firma PQC en directo**: escribe un mensaje, firma, muestra tiempos y tamaños.
+- **Handshake Híbrido**: lanza el protocolo, explica los 7 pasos en pantalla.
+- **Chat en Vivo**: pide al tribunal que escanee el QR y envíe un mensaje firmado.
+
+## Opción alternativa: Demo 2B por terminal
+
+Si el dashboard no está disponible, usa esta opción porque combina transporte XMPP real, autenticación y acuerdo de clave.
+
+### Terminal 1
+
+```bash
+cd /home/david/TFM && source venv/bin/activate
+PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py \
+  --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
 
 ### Terminal 2
 
 ```bash
-cd /home/david/TFM
-source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
+cd /home/david/TFM && source venv/bin/activate
+PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py \
+  --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
-
-### Después del intercambio
-
-```bash
-cd /home/david/TFM
-source venv/bin/activate
-PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
-```
-
-### Qué debes verbalizar durante la ejecución
-
-- El emisor genera el material KEM efímero.
-- El HELLO se firma con el esquema PQC seleccionado.
-- El receptor valida identidad por certificado y verifica la firma.
-- Si la validación es correcta, encapsula el secreto compartido.
-- Ambos lados obtienen el mismo secreto y se registran métricas de tiempo y tamaño.
 
 ## 6. Resultados concretos que conviene citar
 
@@ -227,32 +222,31 @@ Respuesta:
 
 Conviene anticiparte y cerrar con criterio técnico. Estas mejoras son defendibles:
 
-1. Añadir comparación con criptografía clásica para disponer de una referencia base.
-2. Persistir identidades y certificados entre ejecuciones para aproximar un sistema real.
-3. Desplegar el stack con TLS y una infraestructura XMPP más cercana a producción.
-4. Integrar análisis de consumo de CPU y memoria además de latencia y tamaño.
-5. Usar OpenSSL + oqs-provider para una historia X.509/PKI más estándar.
-6. Separar mejor el coste de serialización, red y criptografía en el análisis.
+1. Persistir identidades y certificados entre ejecuciones para aproximar un sistema real.
+2. Desplegar el stack con TLS y una infraestructura XMPP más cercana a producción.
+3. Integrar oqs-provider con OpenSSL para una historia X.509/PKI más estándar.
+4. Separar mejor el coste de serialización, red y criptografía en el análisis.
+5. Añadir más repeticiones con mejor aislamiento experimental.
 
 ## 11. Plan de demo mínimo si el tiempo aprieta
 
 Si solo tienes 5 a 7 minutos, haz esto:
 
 1. Explica la motivación en 30 segundos.
-2. Enseña el esquema de demos en el README.
-3. Ejecuta Demo 2B modo cert.
-4. Muestra summary_experiments.csv.
-5. Cierra con la conclusión principal: ML-DSA rinde mucho mejor que SPHINCS+ en este contexto.
+2. Enseña la estructura en el README.
+3. Arranca el dashboard Streamlit.
+4. Firma un mensaje con ML-DSA y otro con SPHINCS+, muestra la tabla comparativa.
+5. Cierra: ML-DSA rinde mucho mejor en este contexto.
 
 ## 12. Plan de contingencia si algo falla en directo
 
 Si el servidor XMPP no responde o la red falla:
 
-1. Enseña scripts/run_all_demos.sh y explica el flujo automatizado.
-2. Muestra artifacts/logs/run_all para evidenciar ejecuciones previas reales.
-3. Enseña los CSV ya generados.
-4. Enseña los PCAP en artifacts/pcap y abre uno en Wireshark si quieres reforzar que hubo intercambio real.
-5. Ejecuta al menos Demo 2A local y el análisis estadístico, que no dependen de XMPP.
+1. El dashboard Streamlit funciona completamente sin XMPP (pestañas 1 y 2 son locales).
+2. El chat del jurado (pestaña 3) tampoco requiere XMPP.
+3. Enseña `scripts/run_all_demos.sh` y explica el flujo automatizado.
+4. Muestra `artifacts/logs/run_all/` para evidenciar ejecuciones previas reales.
+5. Ejecuta Demo 2A local si quieres mostrar una ejecución terminal en vivo.
 
 ## 13. Frase final recomendada
 

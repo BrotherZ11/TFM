@@ -5,16 +5,16 @@
 
 Puedes empezar así:
 
-> He preparado un entorno experimental donde integro criptografía post-cuántica en XMPP. La demo enseña dos partes: qué se ha implementado en el código y cómo se ejecuta el flujo real de envío, autenticación y acuerdo de clave.
+> He preparado un entorno experimental donde integro criptografía post-cuántica en XMPP. La demo tiene dos modos: un dashboard interactivo donde el propio tribunal puede participar firmando mensajes en tiempo real, y ejecuciones completas por terminal que muestran el flujo real de mensajería.
 
 ## Orden recomendado de la demo
 
 Hazlo en este orden para que se entienda bien:
 
 1. Explicar el objetivo general del proyecto.
-2. Enseñar la estructura del repositorio.
+2. Enseñar la estructura del repositorio (README).
 3. Enseñar los componentes principales del código.
-4. Ejecutar una demo en vivo.
+4. Ejecutar el dashboard Streamlit en vivo.
 5. Explicar qué acaba de pasar internamente.
 
 ## 1. Qué has implementado
@@ -81,11 +81,26 @@ Además del funcionamiento, has implementado medición de:
 - tiempos de encapsulación y desacapsulación,
 - RTT del intercambio,
 - tamaño de stanzas y mensajes,
+- uso de CPU (user ms + sys ms) y memoria RSS durante las operaciones criptográficas,
 - consistencia del secreto compartido.
 
-Cómo explicarlo:
+Como explicarlo:
 
-> No me limito a que funcione. También capturo métricas para evaluar el coste real de integrar PQC en un flujo de mensajería.
+> No me limito a que funcione. Capturo métricas para evaluar el coste real de integrar PQC en un flujo de mensajería, incluyendo uso de CPU y memoria muestreados con psutil durante cada operación.
+
+### Bloque E. Dashboard interactivo Streamlit
+
+Está en `src/demo_live/app.py`.
+
+Qué hace:
+
+- **Firma PQC en directo**: firma cualquier mensaje con ML-DSA-65 o SPHINCS+, muestra métricas y compara ambos algoritmos en tabla.
+- **Handshake Híbrido**: ejecuta el protocolo KEM+firma paso a paso con animación y tiempos reales.
+- **Chat en Vivo**: genera un QR para que el tribunal escanee con el móvil, envíe mensajes firmados con PQC y vea las métricas llegar en tiempo real.
+
+Como explicarlo:
+
+> Este dashboard permite que el tribunal no sea un observador pasivo: pueden enviar mensajes firmados con PQC desde su móvil y ver en directo cómo varían los tiempos y tamaños según el algoritmo elegido.
 
 ## 2. Qué enseñar del código
 
@@ -111,19 +126,22 @@ Qué decir:
 
 ## 3. Demo en vivo recomendada
 
-La mejor demo para explicar funcionamiento es la de handshake híbrido sobre XMPP en modo cert.
+### Opción A (preferida): Dashboard Streamlit
 
-Motivo:
+```bash
+cd /home/david/TFM && source venv/bin/activate
+PYTHONPATH=src streamlit run src/demo_live/app.py --server.address 0.0.0.0
+```
 
-- enseña mensajería real,
-- enseña autenticación,
-- enseña acuerdo de clave,
-- enseña modelo de confianza,
-- y enseña intercambio completo extremo a extremo.
+Abre `http://localhost:8501` y sigue este guión:
 
-## Comandos exactos
+1. Pestaña **✍️ Firma PQC en directo**: escribe una frase, firma con ML-DSA-65, muestra el tiempo. Pulsa “Comparar los dos algoritmos”: ML-DSA-65 firma en ~0.3 ms, SPHINCS+ en ~130 ms, la firma pesa ~3 KB vs ~10 KB.
+2. Pestaña **🤝 Handshake Híbrido**: lanza el protocolo, explica los 7 pasos mientras se ejecutan (KEM keygen, firma HELLO, verificación, encapsulación, decapsulación, secreto coincide).
+3. Pestaña **💬 Chat en Vivo**: pide al tribunal que escanee el QR con el móvil, elija SPHINCS+, envíe un mensaje. Muestra cómo llega firmado con tiempos reales.
 
-### Terminal 1
+### Opción B (alternativa): Handshake híbrido sobre XMPP
+
+La mejor opción terminal porque combina transporte XMPP real, autenticación y acuerdo de clave.
 
 ```bash
 cd /home/david/TFM

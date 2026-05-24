@@ -5,15 +5,13 @@ Uso (desde la raíz del proyecto):
     streamlit run src/demo_live/app.py --server.address 0.0.0.0
 
 Pestañas (vista presentador):
-  1. ✍️  Firma PQC en directo    — keygen + sign + verify sobre texto libre
-  2. 🤝  Handshake Híbrido       — protocolo KEM + firma animado paso a paso
-  3. 📊  Clásico vs PQC          — figuras comparativas RSA/ECDSA/ECDH vs ML-DSA/SPHINCS+/ML-KEM
-  4. 📈  Resultados del experimento — tablas y gráficas del TFM
-  5. 💬  Chat en Vivo            — el jurado escanea un QR y envía mensajes firmados con PQC
+  1. ✍️  Firma PQC en directo    — keygen + sign + verify sobre texto libre; comparativa ML-DSA-65 vs SPHINCS+
+  2. 🤝  Handshake Híbrido       — protocolo KEM + firma animado paso a paso con métricas reales
+  3. 💬  Chat en Vivo            — el jurado escanea un QR y envía mensajes firmados con PQC en tiempo real
 
 Vista jurado (?role=jury):
   Formulario móvil-friendly accesible vía QR. El mensaje se firma con el
-  algoritmo elegido y llega a la pestaña del presentador en tiempo real.
+  algoritmo elegido y llega a la pestaña del presentador con auto-refresco cada 3 s.
 """
 
 import sys
@@ -184,11 +182,10 @@ st.caption(
     "Algoritmos: ML-DSA-65 · SPHINCS+-SHA2-128s · ML-KEM-768 · RSA-2048 · ECDSA-P256 · ECDH-P256"
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "✍️  Firma PQC en directo",
     "🤝  Handshake Híbrido",
-    "📊  Clásico vs PQC",
-    "📈  Resultados del experimento",
+
     "💬  Chat en Vivo",
 ])
 
@@ -477,150 +474,7 @@ Emisor                    Receptor
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — CLÁSICO VS PQC
-# ══════════════════════════════════════════════════════════════════════════════
-with tab3:
-    st.header("Comparativa empírica: criptografía clásica vs post-cuántica")
-    st.markdown(
-        "Benchmarks medidos en el mismo hardware:  \n"
-        "**Clásico** — RSA-2048 · ECDSA-P256 · ECDH-P256  \n"
-        "**Post-cuántico** — ML-DSA-44/65/87 · SPHINCS+-SHA2-128s/f · ML-KEM-512/768/1024"
-    )
-
-    comp_figs = [
-        ("comparison_sign_times.png", "Tiempos de firma — escala logarítmica (ms)"),
-        ("comparison_sig_sizes.png",  "Tamaño de firma y clave pública (bytes)"),
-        ("comparison_kem_times.png",  "Tiempos KEM: keygen · encaps · decaps (ms)"),
-        ("comparison_kem_sizes.png",  "Tamaño KEM: clave pública y ciphertext (bytes)"),
-    ]
-    available = [(FIGS / fn, cap) for fn, cap in comp_figs if (FIGS / fn).exists()]
-
-    if available:
-        col_a, col_b = st.columns(2)
-        for i, (fpath, cap) in enumerate(available):
-            (col_a if i % 2 == 0 else col_b).image(
-                str(fpath), caption=cap, use_container_width=True,
-            )
-    else:
-        st.warning(
-            "Las figuras de comparación no se han generado todavía.  \n"
-            "Pulsa el botón para ejecutar el benchmark completo (≈ 30 s con n=50 iteraciones)."
-        )
-        if st.button("▶️  Generar comparativa clásico vs PQC (n=50)", key="t3_gen"):
-            env = {**os.environ, "PYTHONPATH": str(SRC)}
-            with st.status("Ejecutando benchmark clásico vs PQC…", expanded=True) as gen_status:
-                gen_status.write(
-                    "⏳ Ejecutando `crypto_comparison_bench.py --iterations 50`…"
-                )
-                r_bench = subprocess.run(
-                    [
-                        sys.executable,
-                        "src/metrics/crypto_comparison_bench.py",
-                        "--iterations", "50",
-                    ],
-                    cwd=str(ROOT),
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                )
-                if r_bench.returncode != 0:
-                    gen_status.update(label="Error en el benchmark", state="error")
-                    st.error(r_bench.stderr[-800:])
-                else:
-                    gen_status.write("✅ CSVs generados. Generando figuras…")
-                    subprocess.run(
-                        [sys.executable, "src/metrics/plot_comparison.py"],
-                        cwd=str(ROOT),
-                        capture_output=True,
-                        env=env,
-                    )
-                    gen_status.update(label="¡Listo! Recargando…", state="complete")
-                    st.rerun()
-
-    # Tablas de datos si los CSVs ya existen
-    for csv_path, label in [
-        (CSVS / "sig_comparison_metrics.csv", "Datos de firmas (sig_comparison_metrics.csv)"),
-        (CSVS / "kem_comparison_metrics.csv", "Datos KEM (kem_comparison_metrics.csv)"),
-    ]:
-        if csv_path.exists():
-            with st.expander(f"📄 {label}"):
-                st.dataframe(pd.read_csv(csv_path), use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — RESULTADOS DEL EXPERIMENTO
-# ══════════════════════════════════════════════════════════════════════════════
-with tab4:
-    st.header("Resultados globales del experimento")
-
-    # ── Tabla resumen ─────────────────────────────────────────────────────────
-    summary_csv = CSVS / "summary_experiments.csv"
-    if summary_csv.exists():
-        df_sum = pd.read_csv(summary_csv)
-        key_cols = [
-            c for c in [
-                "experiment", "group", "n",
-                "sign_time_ms_mean", "sign_time_ms_p95",
-                "rtt_ms_mean",
-                "verify_time_ms_mean",
-                "hello_stanza_bytes_mean",
-                "hello_bytes_mean",
-            ]
-            if c in df_sum.columns
-        ]
-        df_disp = df_sum[key_cols].copy()
-        for c in df_disp.select_dtypes("float").columns:
-            df_disp[c] = df_disp[c].round(3)
-        st.subheader("Resumen por experimento")
-        st.dataframe(df_disp, use_container_width=True, hide_index=True)
-
-    # ── Análisis estadístico ──────────────────────────────────────────────────
-    stat_csv = CSVS / "statistical_analysis.csv"
-    if stat_csv.exists():
-        with st.expander("📊 Análisis estadístico — Mann-Whitney U e IC 95%"):
-            st.dataframe(
-                pd.read_csv(stat_csv), use_container_width=True, hide_index=True,
-            )
-
-    # ── Figuras organizadas por demo ──────────────────────────────────────────
-    fig_groups = [
-        ("Demo 1 — Firmas PQC en XMPP (ML-DSA-65 vs SPHINCS+)", [
-            ("box_sign_time_ms.png",        "Tiempo de firma"),
-            ("box_rtt_ms.png",              "RTT por mensaje"),
-            ("box_verify_time_ms.png",      "Tiempo de verificación"),
-            ("bar_sig_b64_bytes.png",       "Tamaño firma (b64)"),
-            ("bar_stanza_bytes_sender.png", "Tamaño stanza emisor"),
-        ]),
-        ("Demo 2A — Handshake híbrido local (sin XMPP)", [
-            ("kem_box_sign_time_ms.png",   "Tiempo de firma"),
-            ("kem_box_verify_time_ms.png", "Tiempo de verificación"),
-            ("kem_box_encaps_time_ms.png", "Encapsulación KEM"),
-            ("kem_box_decaps_time_ms.png", "Decapsulación KEM"),
-            ("kem_bar_hello_bytes.png",    "Tamaño mensaje HELLO"),
-        ]),
-        ("Demo 2B — Handshake híbrido sobre XMPP", [
-            ("hybrid_xmpp_box_sign_ms.png",    "Tiempo de firma"),
-            ("hybrid_xmpp_box_rtt_ms.png",     "RTT handshake"),
-            ("hybrid_xmpp_box_verify_ms.png",  "Tiempo de verificación"),
-            ("hybrid_xmpp_bar_hello_bytes.png","Tamaño stanza HELLO"),
-        ]),
-        ("Demo 3 — Análisis de red (PCAP)", [
-            ("pcap_network_comparison.png", "Comparativa tráfico de red"),
-        ]),
-    ]
-
-    for section_title, figs in fig_groups:
-        existing = [(FIGS / fn, cap) for fn, cap in figs if (FIGS / fn).exists()]
-        if not existing:
-            continue
-        st.subheader(section_title)
-        cols = st.columns(min(len(existing), 2))
-        for i, (fpath, cap) in enumerate(existing):
-            cols[i % 2].image(str(fpath), caption=cap, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 5 — CHAT EN VIVO (jurado ↔ presentador)
+# TAB 3 — CHAT EN VIVO (jurado ↔ presentador)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @st.fragment(run_every="3s")
@@ -662,7 +516,7 @@ def _message_feed() -> None:
                 c4.metric("PK (bytes)",    f"{msg.pk_size_bytes:,}")
 
 
-with tab5:
+with tab3:
     st.header("💬 Chat en Vivo — el tribunal envía mensajes firmados con PQC")
     st.markdown(
         "El jurado escanea el QR con su móvil, escribe un mensaje, "
