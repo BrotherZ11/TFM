@@ -23,7 +23,7 @@ def boxplot_by_group(df, group_col, value_col, title, ylabel, out_png):
     data = [df2[df2[group_col] == g][value_col].values for g in groups]
 
     plt.figure()
-    plt.boxplot(data, tick_labels=groups, showfliers=True)
+    plt.boxplot(data, labels=groups, showfliers=True)
     plt.title(title)
     plt.ylabel(ylabel)
     plt.grid(True, axis="y")
@@ -101,6 +101,32 @@ def main():
         "Tamaño medio de pk b64 (bytes)", "bytes",
         os.path.join(FIGS_DIR, "bar_pk_b64_bytes.png")
     )
+
+    # ── Overhead RTT: rtt_ms vs net_baseline_rtt_ms ──────────────────────────
+    if "net_baseline_rtt_ms" in sender.columns:
+        families = sorted(sender["alg_family"].unique())
+        rtt_means      = [sender[sender["alg_family"] == f]["rtt_ms"].mean() for f in families]
+        baseline_means = [sender[sender["alg_family"] == f]["net_baseline_rtt_ms"].mean() for f in families]
+        overhead_means = [r - b for r, b in zip(rtt_means, baseline_means)]
+
+        x = range(len(families))
+        width = 0.28
+        fig, ax = plt.subplots(figsize=(7, 4))
+        bars_b = ax.bar([i - width for i in x], baseline_means, width, label="Baseline TCP (sin PQC)", color="#90CAF9")
+        bars_r = ax.bar([i          for i in x], rtt_means,      width, label="RTT con PQC",           color="#1565C0")
+        bars_o = ax.bar([i + width  for i in x], overhead_means,  width, label="Overhead PQC",          color="#EF5350")
+
+        ax.set_xticks(list(x))
+        ax.set_xticklabels(families)
+        ax.set_ylabel("ms")
+        ax.set_title("Overhead RTT introducido por PQC vs baseline TCP (loopback)")
+        ax.legend()
+        ax.grid(True, axis="y", alpha=0.4)
+        fig.tight_layout()
+        out_rtt = os.path.join(FIGS_DIR, "bar_rtt_overhead.png")
+        fig.savefig(out_rtt, dpi=180)
+        plt.close(fig)
+        print("Saved:", out_rtt)
 
 
 if __name__ == "__main__":

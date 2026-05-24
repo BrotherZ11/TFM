@@ -2,3 +2,9 @@ liboqs-python
 slixmpp 
 matplotlib
 pandas
+scipy
+cryptography
+scapy
+psutil
+streamlit
+qrcode[pil]

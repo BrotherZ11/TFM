@@ -1,0 +1,9 @@
+pcap_file,scenario,filter,total_packets,total_ip_bytes,total_tcp_payload_bytes,num_tcp_segments,num_large_segments,num_streams,session_duration_ms,mean_payload_bytes,max_payload_bytes,retransmissions
+demo1_signatures_xmpp.pcapng,Demo1 – Firmas XMPP,xmpp:5222,1696,3829828,3717828,948,500,8,35733.42,3921.8,10812,730
+demo2a_local_optional.pcapng,Demo2A – Local,tcp_all,846,809460,751916,556,33,6,9659.08,1352.4,65467,285
+demo2b_hybrid_xmpp_cert.pcapng,Demo2B – Cert,xmpp:5222,662,1733992,1690236,328,300,8,13354.79,5153.2,13426,316
+demo2b_hybrid_xmpp_cert_509.pcapng,Demo2B – Cert X.509,xmpp:5222,662,1735316,1690236,328,300,8,12540.28,5153.2,13426,316
+demo2c_hybrid_xmpp_qr.pcapng,Demo2C – QR,xmpp:5222,662,1733992,1690236,328,300,8,13094.58,5153.2,13426,316
+demoA_mldsa.pcapng,Demo1 – ML-DSA,xmpp:5222,668,1556866,1508706,430,200,8,13618.63,3508.6,7327,220
+demoA_sphnics.pcapng,Demo1 – SPHINCS+,xmpp:5222,1066,2289722,2212906,530,300,8,31678.61,4175.3,10812,518
+demoA_wsl_clear.pcap,Demo1 – Texto claro,xmpp:5222,1672,3835138,3714690,930,500,10,39678.3,3994.3,10812,721
