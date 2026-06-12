@@ -42,6 +42,22 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Configuración de entorno:
+
+```bash
+cp example.env .env
+```
+
+Los entrypoints XMPP leen automáticamente `.env` y usan estas variables:
+
+- `XMPP_DOMAIN`
+- `XMPP_EMISOR_USER`, `XMPP_EMISOR_PASS`
+- `XMPP_RECEPTOR_USER`, `XMPP_RECEPTOR_PASS`
+- `XMPP_ADMIN_USER`, `XMPP_ADMIN_PASS`
+- `XMPP_HOST`, `XMPP_PORT`
+
+Si `XMPP_EMISOR_USER` o `XMPP_RECEPTOR_USER` no incluyen `@dominio`, el JID final se construye como `usuario@XMPP_DOMAIN`.
+
 ## Demo 1: firmas PQC en XMPP
 
 Receptor:

@@ -3,6 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PY="$ROOT_DIR/venv/bin/python"
+
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 export PYTHONPATH="$ROOT_DIR/src"
 export PYTHONUNBUFFERED=1
 
@@ -313,11 +321,6 @@ main() {
     "$LOG_DIR/demo3_plot_comparison.log" \
     "$TIMEOUT_DEMO3"
 
-  run_fg \
-    "Demo3 generate_results_doc" \
-    "PYTHONPATH='$PYTHONPATH' '$VENV_PY' '$ROOT_DIR/src/metrics/generate_results_doc.py'" \
-    "$LOG_DIR/demo3_results_doc.log" \
-    "$TIMEOUT_DEMO3"
 
   log "Ejecución completa ✅"
   log "Logs: $LOG_DIR"

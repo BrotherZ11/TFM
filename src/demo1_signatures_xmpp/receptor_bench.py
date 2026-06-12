@@ -6,6 +6,7 @@ import psutil as _psutil
 import slixmpp
 from slixmpp.xmlstream import ET
 from crypto.pqc_wrapper import PQCProvider
+from crypto.xmpp_env import get_xmpp_host, get_xmpp_jid, get_xmpp_password, get_xmpp_port
 from metrics.realtime import RealtimeStats
 
 NS = "urn:uma:tfm:pqc:0"
@@ -168,12 +169,15 @@ class ReceptorBench(slixmpp.ClientXMPP):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Receptor benchmark con firmas PQC")
-    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--host", default=get_xmpp_host())
+    parser.add_argument("--port", type=int, default=get_xmpp_port())
     parser.add_argument("--startup-timeout", type=int, default=20)
     args = parser.parse_args()
 
-    bot = ReceptorBench("receptor@localhost", "123", startup_timeout_s=args.startup_timeout)
+    receptor_jid = get_xmpp_jid("RECEPTOR")
+    receptor_password = get_xmpp_password("RECEPTOR")
+
+    bot = ReceptorBench(receptor_jid, receptor_password, startup_timeout_s=args.startup_timeout)
     bot.register_plugin("xep_0030")
     bot.register_plugin("xep_0184")  # Delivery Receipts
 

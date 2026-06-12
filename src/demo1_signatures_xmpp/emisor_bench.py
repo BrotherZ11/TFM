@@ -7,6 +7,7 @@ import psutil as _psutil
 import slixmpp
 from slixmpp.xmlstream import ET
 from crypto.pqc_wrapper import PQCProvider
+from crypto import xmpp_env
 from metrics.realtime import RealtimeStats
 
 NS = "urn:uma:tfm:pqc:0"
@@ -260,8 +261,8 @@ class EmisorBench(slixmpp.ClientXMPP):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Emisor benchmark con firmas PQC")
-    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--host", default=xmpp_env.get_xmpp_host())
+    parser.add_argument("--port", type=int, default=xmpp_env.get_xmpp_port())
     parser.add_argument("--startup-timeout", type=int, default=20)
     parser.add_argument(
         "--iterations", type=int, default=100,
@@ -273,8 +274,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    emisor_jid = xmpp_env.get_xmpp_jid("EMISOR")
+    receptor_jid = xmpp_env.get_xmpp_jid("RECEPTOR")
+    emisor_password = xmpp_env.get_xmpp_password("EMISOR")
+
     bot = EmisorBench(
-        "emisor@localhost", "123", "receptor@localhost",
+        emisor_jid, emisor_password, receptor_jid,
         startup_timeout_s=args.startup_timeout,
         algs=_ALG_FAMILIES[args.algorithms],
         iterations=args.iterations,

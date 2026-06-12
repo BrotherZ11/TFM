@@ -12,6 +12,7 @@ from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
 from crypto.pqc_certificate import create_certificate, create_self_signed_certificate, certificate_to_pem
+from crypto import xmpp_env
 from metrics.realtime import RealtimeStats
 from demo2_hybrid_kem_signed.protocol import NS_HYBRID, hello_message_to_sign, sha256_hex_from_b64
 
@@ -387,12 +388,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Emisor benchmark de handshake híbrido con verificación por certificado o QR")
     parser.add_argument("--verify-mode", choices=["cert", "qr"], default="cert")
     parser.add_argument("--issuer-dn", default="CN=UMA-PQC-CA,O=UMA,C=ES")
-    parser.add_argument("--subject-base-dn", default="CN=emisor@localhost,O=UMA,C=ES")
+    parser.add_argument("--subject-base-dn", default=xmpp_env.get_subject_dn("EMISOR"))
     parser.add_argument("--ca-secret-key-file", default=None)
     parser.add_argument("--ca-public-key-file", default=None)
     parser.add_argument("--qr-fingerprint-output-file", default="artifacts/csv/trusted_qr_fingerprints.txt")
-    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--host", default=xmpp_env.get_xmpp_host())
+    parser.add_argument("--port", type=int, default=xmpp_env.get_xmpp_port())
     parser.add_argument("--startup-timeout", type=int, default=20)
     parser.add_argument(
         "--iterations", type=int, default=30,
@@ -400,10 +401,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    emisor_jid = xmpp_env.get_xmpp_jid("EMISOR")
+    receptor_jid = xmpp_env.get_xmpp_jid("RECEPTOR")
+    emisor_password = xmpp_env.get_xmpp_password("EMISOR")
+
     bot = EmisorHybridBench(
-        "emisor@localhost",
-        "123",
-        "receptor@localhost",
+        emisor_jid,
+        emisor_password,
+        receptor_jid,
         verify_mode=args.verify_mode,
         issuer_dn=args.issuer_dn,
         subject_base_dn=args.subject_base_dn,

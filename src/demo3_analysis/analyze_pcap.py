@@ -146,40 +146,80 @@ def save_csv(rows: list):
 def save_figure(rows: list):
     os.makedirs(OUT_FIG.parent, exist_ok=True)
 
+    # Excluir capturas combinadas/redundantes: la captura conjunta Demo1 y la
+    # captura WSL-completa no son comparables directamente con las individuales.
+    EXCLUDE = {"demo1_signatures_xmpp", "demoA_wsl_clear"}
+    rows = [r for r in rows if r["pcap_file"].split(".")[0] not in EXCLUDE]
+
+    # Orden lógico: Demo1 PQC → Demo2A local → Demo2B/C XMPP
+    ORDER = [
+        "Demo1 – ML-DSA",
+        "Demo1 – SPHINCS+",
+        "Demo2A – Local",
+        "Demo2B – Cert",
+        "Demo2B – Cert X.509",
+        "Demo2C – QR",
+    ]
+    rows = sorted(rows, key=lambda r: ORDER.index(r["scenario"]) if r["scenario"] in ORDER else 99)
+
+    # Colores por grupo de experimento
+    COLOR_MAP = {
+        "Demo1 – ML-DSA":      "#1565C0",  # azul oscuro
+        "Demo1 – SPHINCS+":    "#42A5F5",  # azul claro
+        "Demo2A – Local":      "#6A1B9A",  # morado
+        "Demo2B – Cert":       "#2E7D32",  # verde oscuro
+        "Demo2B – Cert X.509": "#66BB6A",  # verde claro
+        "Demo2C – QR":         "#A5D6A7",  # verde muy claro
+    }
+
     scenarios  = [r["scenario"] for r in rows]
     ip_kb      = [r["total_ip_bytes"] / 1024 for r in rows]
+    payload_kb = [r["total_tcp_payload_bytes"] / 1024 for r in rows]
     large_segs = [r["num_large_segments"] for r in rows]
     dur_s      = [r["session_duration_ms"] / 1000 for r in rows]
+    retrans    = [r["retransmissions"] for r in rows]
+    bar_colors = [COLOR_MAP.get(s, "#90A4AE") for s in scenarios]
     x          = list(range(len(rows)))
 
-    fig, axes = plt.subplots(3, 1, figsize=(13, 11))
-    colors = ["#2196F3", "#FF5722", "#4CAF50"]
+    fig, axes = plt.subplots(4, 1, figsize=(11, 15))
+
+    def _bar(ax, values, ylabel, title, fmt="%.0f", suffix=""):
+        bars = ax.bar(x, values, color=bar_colors)
+        ax.set_title(title, fontsize=10)
+        ax.set_ylabel(ylabel)
+        ax.set_xticks(x)
+        ax.set_xticklabels(scenarios, rotation=28, ha="right", fontsize=8)
+        ax.bar_label(bars, labels=[f"{v:{fmt[2:]}}{suffix}" for v in values], fontsize=7, padding=2)
+        ax.set_ylim(0, max(values) * 1.15)
 
     # Subplot 1: Bytes IP totales
-    b1 = axes[0].bar(x, ip_kb, color=colors[0])
-    axes[0].set_title("Bytes IP totales por escenario")
-    axes[0].set_ylabel("KB")
-    axes[0].set_xticks(x)
-    axes[0].set_xticklabels(scenarios, rotation=28, ha="right", fontsize=8)
-    axes[0].bar_label(b1, fmt="%.0f", fontsize=7)
+    _bar(axes[0], ip_kb, "KB", "Tráfico IP total por escenario", fmt="%.0f", suffix=" KB")
 
-    # Subplot 2: Segmentos TCP grandes (proxy del overhead de mensajes PQC)
-    b2 = axes[1].bar(x, large_segs, color=colors[1])
-    axes[1].set_title("Segmentos TCP con payload > 1460 bytes (mensajes PQC grandes)")
-    axes[1].set_ylabel("Nº segmentos")
-    axes[1].set_xticks(x)
-    axes[1].set_xticklabels(scenarios, rotation=28, ha="right", fontsize=8)
-    axes[1].bar_label(b2, fontsize=7)
+    # Subplot 2: Payload TCP útil
+    _bar(axes[1], payload_kb, "KB", "Payload TCP útil por escenario", fmt="%.0f", suffix=" KB")
 
-    # Subplot 3: Duración de sesión TCP
-    b3 = axes[2].bar(x, dur_s, color=colors[2])
-    axes[2].set_title("Duración de sesión TCP")
-    axes[2].set_ylabel("Segundos")
-    axes[2].set_xticks(x)
-    axes[2].set_xticklabels(scenarios, rotation=28, ha="right", fontsize=8)
-    axes[2].bar_label(b3, fmt="%.2f s", fontsize=7)
+    # Subplot 3: Segmentos TCP con payload > 1460 B (overhead de material PQC grande)
+    _bar(axes[2], large_segs, "Nº segmentos",
+         "Segmentos TCP con payload > 1460 bytes (indicador de stanzas PQC grandes)",
+         fmt="%.0f")
 
-    plt.suptitle("Análisis de tráfico de red — Capturas PCAP", fontsize=12, fontweight="bold")
+    # Subplot 4: Duración de sesión TCP
+    _bar(axes[3], dur_s, "Segundos", "Duración de sesión TCP", fmt="%.2f", suffix=" s")
+
+    # Leyenda de grupos
+    from matplotlib.patches import Patch
+    legend_handles = [
+        Patch(color="#1565C0", label="Demo1 — ML-DSA-65"),
+        Patch(color="#42A5F5", label="Demo1 — SPHINCS+-128s"),
+        Patch(color="#6A1B9A", label="Demo2A — Handshake local"),
+        Patch(color="#2E7D32", label="Demo2B/C — Handshake XMPP"),
+    ]
+    fig.legend(handles=legend_handles, loc="upper right", fontsize=8,
+               title="Familia / experimento", title_fontsize=8,
+               framealpha=0.85, bbox_to_anchor=(0.99, 0.99))
+
+    plt.suptitle("Análisis de tráfico de red — Comparativa por algoritmo PQC",
+                 fontsize=12, fontweight="bold", y=1.01)
     plt.tight_layout()
     plt.savefig(OUT_FIG, dpi=150, bbox_inches="tight")
     plt.close()

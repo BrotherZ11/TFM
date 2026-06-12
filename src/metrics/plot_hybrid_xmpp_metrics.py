@@ -1,4 +1,4 @@
-import os
+import osresultados_dis
 import pandas as pd
 import matplotlib.pyplot as plt
 

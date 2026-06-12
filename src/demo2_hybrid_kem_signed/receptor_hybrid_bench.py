@@ -11,6 +11,7 @@ from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
 from crypto.pqc_certificate import certificate_from_pem, verify_certificate
+from crypto.xmpp_env import get_xmpp_host, get_xmpp_jid, get_xmpp_password, get_xmpp_port
 from metrics.realtime import RealtimeStats
 from demo2_hybrid_kem_signed.protocol import NS_HYBRID, hello_message_to_sign, sha256_hex_from_b64, load_trusted_values
 
@@ -256,14 +257,17 @@ if __name__ == "__main__":
     parser.add_argument("--verify-mode", choices=["cert", "qr"], default="cert")
     parser.add_argument("--trusted-fingerprints-file", default="artifacts/csv/trusted_qr_fingerprints.txt")
     parser.add_argument("--trusted-issuer-public-keys-file", default=None)
-    parser.add_argument("--host", default=os.getenv("XMPP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("XMPP_PORT", "5222")))
+    parser.add_argument("--host", default=get_xmpp_host())
+    parser.add_argument("--port", type=int, default=get_xmpp_port())
     parser.add_argument("--startup-timeout", type=int, default=20)
     args = parser.parse_args()
 
+    receptor_jid = get_xmpp_jid("RECEPTOR")
+    receptor_password = get_xmpp_password("RECEPTOR")
+
     bot = ReceptorHybridBench(
-        "receptor@localhost",
-        "123",
+        receptor_jid,
+        receptor_password,
         verify_mode=args.verify_mode,
         trusted_fingerprints_file=args.trusted_fingerprints_file,
         trusted_issuer_public_keys_file=args.trusted_issuer_public_keys_file,

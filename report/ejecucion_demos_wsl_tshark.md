@@ -5,7 +5,7 @@
 Desde WSL Ubuntu, en la raíz del proyecto:
 
 ```bash
-cd /home/david/TFM
+cd $HOME/tu-repositorio  # Reemplaza con la ruta local donde clonaste el proyecto
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -33,14 +33,12 @@ mkdir -p artifacts/pcap
 ### Terminal A — Captura tshark
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -f "tcp port 5222" -w artifacts/pcap/demo1_signatures_xmpp.pcapng
 ```
 
 ### Terminal B — Receptor
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/receptor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -48,7 +46,6 @@ PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/receptor_bench.py --hos
 ### Terminal C — Emisor
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo1_signatures_xmpp/emisor_bench.py --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -66,7 +63,6 @@ Este benchmark es local (sin XMPP), por lo que no hay tráfico de aplicación en
 ### Ejecución
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/kem_signed_bench.py --iterations 20
 ```
@@ -74,7 +70,6 @@ PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/kem_signed_bench.py -
 ### Captura tshark (opcional, esperable casi vacía)
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -a duration:60 -w artifacts/pcap/demo2a_local_optional.pcapng
 ```
 
@@ -85,14 +80,12 @@ sudo tshark -i any -a duration:60 -w artifacts/pcap/demo2a_local_optional.pcapng
 ### Terminal A — Captura tshark
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -f "tcp port 5222" -w artifacts/pcap/demo2b_hybrid_xmpp_cert.pcapng
 ```
 
 ### Terminal B — Receptor (cert)
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -100,7 +93,6 @@ PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench
 ### Terminal C — Emisor (cert)
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py --verify-mode cert --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -114,12 +106,12 @@ En Terminal A: `Ctrl+C`
 Tras ejecutar Demo 2B, genera el análisis estadístico (IC95 + Mann-Whitney U):
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
 ```
 
 Resultado:
+
 - `artifacts/csv/statistical_analysis.csv`
 
 ---
@@ -129,14 +121,12 @@ Resultado:
 ### Terminal A — Captura tshark
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -f "tcp port 5222" -w artifacts/pcap/demo2c_hybrid_xmpp_qr.pcapng
 ```
 
 ### Terminal B — Receptor (qr)
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench.py --verify-mode qr --trusted-fingerprints-file artifacts/csv/trusted_qr_fingerprints.txt --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -144,7 +134,6 @@ PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/receptor_hybrid_bench
 ### Terminal C — Emisor (qr)
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/demo2_hybrid_kem_signed/emisor_hybrid_bench.py --verify-mode qr --qr-fingerprint-output-file artifacts/csv/trusted_qr_fingerprints.txt --host 127.0.0.1 --port 5222 --startup-timeout 20
 ```
@@ -162,7 +151,6 @@ No requiere tráfico de red: procesa CSV ya generados.
 ### Ejecución
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/metrics/plot_metrics.py
 PYTHONPATH=src venv/bin/python src/metrics/plot_kem_signed_metrics.py
@@ -174,7 +162,6 @@ PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
 ### Captura tshark (opcional, esperable vacía)
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -a duration:30 -w artifacts/pcap/demo3_analysis_optional.pcapng
 ```
 
@@ -183,28 +170,24 @@ sudo tshark -i any -a duration:30 -w artifacts/pcap/demo3_analysis_optional.pcap
 ## 6) Ejecución completa automática (opcional)
 
 ```bash
-cd /home/david/TFM
 ./scripts/run_all_demos.sh
 ```
 
 Con captura global durante toda la ejecución:
 
 ```bash
-cd /home/david/TFM
 sudo tshark -i any -f "tcp port 5222" -w artifacts/pcap/run_all_demos.pcapng
 ```
 
 En otra terminal:
 
 ```bash
-cd /home/david/TFM
 ./scripts/run_all_demos.sh
 ```
 
 Al terminar, ejecuta también el análisis estadístico nuevo:
 
 ```bash
-cd /home/david/TFM
 source venv/bin/activate
 PYTHONPATH=src venv/bin/python src/metrics/analyze_results.py
 ```

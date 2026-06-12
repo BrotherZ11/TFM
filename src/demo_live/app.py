@@ -7,9 +7,9 @@ Uso (desde la raíz del proyecto):
 Pestañas (vista presentador):
   1. ✍️  Firma PQC en directo    — keygen + sign + verify sobre texto libre; comparativa ML-DSA-65 vs SPHINCS+
   2. 🤝  Handshake Híbrido       — protocolo KEM + firma animado paso a paso con métricas reales
-  3. 💬  Chat en Vivo            — el jurado escanea un QR y envía mensajes firmados con PQC en tiempo real
+  3. 💬  Chat en Vivo            — se escanea un QR y envía mensajes firmados con PQC en tiempo real
 
-Vista jurado (?role=jury):
+Vista chat (?role=jury):
   Formulario móvil-friendly accesible vía QR. El mensaje se firma con el
   algoritmo elegido y llega a la pestaña del presentador con auto-refresco cada 3 s.
 """
@@ -34,7 +34,7 @@ import streamlit as st
 import pandas as pd
 
 # ── rutas del proyecto ────────────────────────────────────────────────────────
-ROOT = Path(__file__).resolve().parents[2]   # /home/david/TFM
+ROOT = Path(__file__).resolve().parents[2]  
 SRC  = ROOT / "src"
 FIGS = ROOT / "artifacts" / "figs"
 CSVS = ROOT / "artifacts" / "csv"
@@ -57,7 +57,7 @@ def get_pqc() -> PQCProvider:
     return PQCProvider()
 
 
-# ── Datos compartidos entre sesiones (jurado ↔ presentador) ──────────────────
+# ── Datos compartidos entre sesiones ──────────────────
 
 @dataclass
 class ChatMessage:
@@ -74,14 +74,14 @@ class ChatMessage:
 
 @st.cache_resource
 def get_message_store() -> dict:
-    """Estado compartido entre todas las sesiones Streamlit (jurado + presentador)."""
+    """Estado compartido entre todas las sesiones Streamlit."""
     return {"messages": deque(maxlen=50), "lock": threading.Lock()}
 
 
 # ── Utilidades de red y QR ────────────────────────────────────────────────────
 
 def get_local_ip() -> str:
-    """Devuelve la IP local de red (no loopback) para que el jurado pueda conectar."""
+    """Devuelve la IP local de red (no loopback) para que se pueda conectar."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -112,12 +112,12 @@ SIG_OPTIONS: dict[str, str] = {
 KEM_ALG = "ML-KEM-768"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ENRUTAMIENTO — el jurado accede vía ?role=jury (enlace en el QR)
+# ENRUTAMIENTO — se accede vía ?role=jury (enlace en el QR)
 # ══════════════════════════════════════════════════════════════════════════════
 _role = st.query_params.get("role", "presenter")
 
 if _role == "jury":
-    # ── Vista jurado (mobile-friendly) ───────────────────────────────────────
+    # ── Vista chat (mobile-friendly) ───────────────────────────────────────
     st.title("📨 Enviar mensaje al presentador")
     st.caption("TFM — Criptografía Post-Cuántica en XMPP · Universidad de Málaga")
     st.info(
@@ -125,7 +125,7 @@ if _role == "jury":
         "antes de llegar al presentador. El presentador verifica la firma en tiempo real."
     )
 
-    sender_name = st.text_input("Tu nombre (opcional)", placeholder="Miembro del tribunal")
+    sender_name = st.text_input("Tu nombre (opcional)", placeholder="Remitente")
     msg_content = st.text_area("Mensaje", placeholder="Escribe tu pregunta o mensaje aquí…", height=120)
     alg_choice  = st.selectbox("Algoritmo de firma PQC", list(SIG_OPTIONS))
     alg_name    = SIG_OPTIONS[alg_choice]
@@ -146,7 +146,7 @@ if _role == "jury":
 
                 chat_msg = ChatMessage(
                     timestamp     = datetime.now().strftime("%H:%M:%S"),
-                    sender        = sender_name.strip() or "Tribunal",
+                    sender        = sender_name.strip() or "Remitente",
                     content       = msg_content,
                     alg_name      = alg_name,
                     sign_time_ms  = res.sign_time_ms,
@@ -170,7 +170,7 @@ if _role == "jury":
             st.markdown("---")
             st.markdown("Puedes enviar otro mensaje si lo deseas. La firma anterior ya llegó al presentador.")
 
-    st.stop()  # No renderizar la vista del presentador para el jurado
+    st.stop()  # No renderizar la vista del presentador
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -178,7 +178,7 @@ if _role == "jury":
 # ══════════════════════════════════════════════════════════════════════════════
 st.title("🔐 Criptografía Post-Cuántica en Mensajería XMPP")
 st.caption(
-    "**Universidad de Málaga · TFM · Demo en vivo para el tribunal**  ·  "
+    "**Universidad de Málaga · TFM · Demo en vivo**  ·  "
     "Algoritmos: ML-DSA-65 · SPHINCS+-SHA2-128s · ML-KEM-768 · RSA-2048 · ECDSA-P256 · ECDH-P256"
 )
 
@@ -474,22 +474,22 @@ Emisor                    Receptor
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — CHAT EN VIVO (jurado ↔ presentador)
+# TAB 3 — CHAT EN VIVO 
 # ══════════════════════════════════════════════════════════════════════════════
 
 @st.fragment(run_every="3s")
 def _message_feed() -> None:
-    """Fragment con auto-refresco cada 3 s — muestra los mensajes del jurado."""
+    """Fragment con auto-refresco cada 3 s — muestra los mensajes enviados."""
     store    = get_message_store()
     messages = list(store["messages"])
 
     col_btn, col_count = st.columns([2, 1])
-    col_btn.markdown("**Mensajes recibidos del tribunal** (actualización automática cada 3 s)")
+    col_btn.markdown("**Mensajes recibidos del remitente** (actualización automática cada 3 s)")
     col_count.markdown(f"📨 **{len(messages)}** mensaje(s)")
 
     if not messages:
         st.info(
-            "Esperando mensajes… Pide al jurado que escanee el QR de la izquierda "
+            "Esperando mensajes… Pide a alguien que escanee el QR de la izquierda "
             "con su móvil y envíe un mensaje firmado con PQC."
         )
         return
@@ -517,9 +517,9 @@ def _message_feed() -> None:
 
 
 with tab3:
-    st.header("💬 Chat en Vivo — el tribunal envía mensajes firmados con PQC")
+    st.header("💬 Chat en Vivo — el remitente envía mensajes firmados con PQC")
     st.markdown(
-        "El jurado escanea el QR con su móvil, escribe un mensaje, "
+        "Alguien escanea el QR con su móvil, escribe un mensaje, "
         "elige el algoritmo de firma y pulsa **Enviar**.  \n"
         "El mensaje llega aquí **firmado y verificado en tiempo real** con `liboqs`."
     )
@@ -543,7 +543,7 @@ with tab3:
     with col_steps:
         st.markdown(
             """
-**Pasos para el jurado:**
+**Pasos para el qr:**
 
 1. Escanear el QR con la cámara del móvil (o introducir la URL en el navegador)
 2. Escribir el nombre y el mensaje
@@ -555,7 +555,7 @@ with tab3:
 - La firma se genera *en tiempo real* con `liboqs` (biblioteca Open Quantum Safe)
 - El presentador verifica la firma sin necesidad de canal seguro previo
 - Se puede comparar la latencia y el tamaño de ambos algoritmos sobre el mismo mensaje real
-- Cambiando el algoritmo, el jurado verá directamente el impacto: SPHINCS+ tarda ~×400 más
+- Cambiando el algoritmo, se verá directamente el impacto: SPHINCS+ tarda ~×400 más
 """
         )
 

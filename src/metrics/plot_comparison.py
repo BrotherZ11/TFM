@@ -48,6 +48,21 @@ TYPE_COLORS = {"classical": "#9E9E9E", "pqc": "#2196F3"}
 SPHINCS_COLOR = "#FF5722"   # destaca SPHINCS+ por su diferente perfil de rendimiento
 
 
+def _finalize_layout(fig: plt.Figure):
+    """Reserva espacio para título y leyenda superiores sin solapar subplots."""
+    fig.tight_layout(rect=[0.02, 0.06, 0.98, 0.88])
+
+
+def _add_bar_label_headroom(ax: plt.Axes, values, pad_ratio: float = 0.12):
+    """Añade margen superior al eje Y para evitar colisión con etiquetas de barras."""
+    values = list(values)
+    if not values:
+        return
+    ymax = max(values)
+    # Evita que las etiquetas queden pegadas al borde superior en barras muy altas.
+    ax.set_ylim(0, ymax * (1.0 + pad_ratio))
+
+
 def _alg_color(row_type: str, alg_name: str) -> str:
     if "SPHINCS" in alg_name:
         return SPHINCS_COLOR
@@ -104,9 +119,9 @@ def plot_sign_times(df: pd.DataFrame):
         mpatches.Patch(color=TYPE_COLORS["pqc"],       label="PQC – retículos (ML-DSA)"),
         mpatches.Patch(color=SPHINCS_COLOR,            label="PQC – hash (SPHINCS+)"),
     ]
-    fig.legend(handles=legend_patches, loc="upper center", ncol=3, fontsize=9, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("Comparativa tiempos de firma y verificación — Clásico vs PQC", fontsize=11, fontweight="bold")
-    plt.tight_layout()
+    fig.legend(handles=legend_patches, loc="upper center", ncol=3, fontsize=9, bbox_to_anchor=(0.5, 0.945))
+    fig.suptitle("Comparativa tiempos de firma y verificación — Clásico vs PQC", fontsize=11, fontweight="bold", y=0.985)
+    _finalize_layout(fig)
     out = FIG_DIR / "comparison_sign_times.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
@@ -122,7 +137,7 @@ def plot_sig_sizes(df: pd.DataFrame):
         .reindex(SIG_ORDER)
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     type_map  = df.drop_duplicates("alg_name").set_index("alg_name")["alg_type"].to_dict()
     colors    = [_alg_color(type_map.get(a, "pqc"), a) for a in summary.index]
     x         = range(len(summary))
@@ -138,6 +153,7 @@ def plot_sig_sizes(df: pd.DataFrame):
         ax.set_xticks(list(x))
         ax.set_xticklabels(summary.index, rotation=35, ha="right", fontsize=8)
         ax.bar_label(bars, fmt="%.0f", fontsize=7, padding=2)
+        _add_bar_label_headroom(ax, values)
         ax.grid(axis="y", linestyle="--", alpha=0.4)
 
     legend_patches = [
@@ -145,9 +161,9 @@ def plot_sig_sizes(df: pd.DataFrame):
         mpatches.Patch(color=TYPE_COLORS["pqc"],       label="PQC – ML-DSA"),
         mpatches.Patch(color=SPHINCS_COLOR,            label="PQC – SPHINCS+"),
     ]
-    fig.legend(handles=legend_patches, loc="upper center", ncol=3, fontsize=9, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("Overhead de tamaño — Firma y clave pública: Clásico vs PQC", fontsize=11, fontweight="bold")
-    plt.tight_layout()
+    fig.legend(handles=legend_patches, loc="upper center", ncol=3, fontsize=9, bbox_to_anchor=(0.5, 0.945))
+    fig.suptitle("Overhead de tamaño — Firma y clave pública: Clásico vs PQC", fontsize=11, fontweight="bold", y=0.985)
+    _finalize_layout(fig)
     out = FIG_DIR / "comparison_sig_sizes.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
@@ -182,9 +198,9 @@ def plot_kem_times(df: pd.DataFrame):
         mpatches.Patch(color=TYPE_COLORS["classical"], label="ECDH P-256 (clásico)"),
         mpatches.Patch(color=TYPE_COLORS["pqc"],       label="ML-KEM (PQC)"),
     ]
-    fig.legend(handles=legend_patches, loc="upper center", ncol=2, fontsize=9, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("Comparativa tiempos KEM — ECDH P-256 vs ML-KEM", fontsize=11, fontweight="bold")
-    plt.tight_layout()
+    fig.legend(handles=legend_patches, loc="upper center", ncol=2, fontsize=9, bbox_to_anchor=(0.5, 0.945))
+    fig.suptitle("Comparativa tiempos KEM — ECDH P-256 vs ML-KEM", fontsize=11, fontweight="bold", y=0.985)
+    _finalize_layout(fig)
     out = FIG_DIR / "comparison_kem_times.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()
@@ -200,7 +216,7 @@ def plot_kem_sizes(df: pd.DataFrame):
         .reindex(KEM_ORDER)
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 6))
     type_map  = df.drop_duplicates("alg_name").set_index("alg_name")["alg_type"].to_dict()
     colors    = [TYPE_COLORS.get(type_map.get(a, "pqc"), "#2196F3") for a in summary.index]
     x         = range(len(summary))
@@ -216,15 +232,16 @@ def plot_kem_sizes(df: pd.DataFrame):
         ax.set_xticks(list(x))
         ax.set_xticklabels(summary.index, rotation=20, ha="right", fontsize=9)
         ax.bar_label(bars, fmt="%.0f", fontsize=8, padding=2)
+        _add_bar_label_headroom(ax, values)
         ax.grid(axis="y", linestyle="--", alpha=0.4)
 
     legend_patches = [
         mpatches.Patch(color=TYPE_COLORS["classical"], label="ECDH P-256 (clásico)"),
         mpatches.Patch(color=TYPE_COLORS["pqc"],       label="ML-KEM (PQC)"),
     ]
-    fig.legend(handles=legend_patches, loc="upper center", ncol=2, fontsize=9, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("Overhead de tamaño KEM — ECDH P-256 vs ML-KEM", fontsize=11, fontweight="bold")
-    plt.tight_layout()
+    fig.legend(handles=legend_patches, loc="upper center", ncol=2, fontsize=9, bbox_to_anchor=(0.5, 0.945))
+    fig.suptitle("Overhead de tamaño KEM — ECDH P-256 vs ML-KEM", fontsize=11, fontweight="bold", y=0.985)
+    _finalize_layout(fig)
     out = FIG_DIR / "comparison_kem_sizes.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     plt.close()

@@ -47,6 +47,39 @@ def bar_mean_by_group(df, group_col, value_col, title, ylabel, out_png):
     print("Saved:", out_png)
 
 
+def stacked_stanza_breakdown(df, group_col, out_png):
+    summary = (
+        df.groupby(group_col)[["body_bytes", "sig_b64_bytes", "pk_b64_bytes", "stanza_bytes"]]
+        .mean(numeric_only=True)
+        .sort_index()
+    )
+    xml_overhead = summary["stanza_bytes"] - (
+        summary["body_bytes"] + summary["sig_b64_bytes"] + summary["pk_b64_bytes"]
+    )
+    xml_overhead = xml_overhead.clip(lower=0)
+
+    plt.figure(figsize=(8, 5))
+    x = range(len(summary.index))
+    body = summary["body_bytes"]
+    sig = summary["sig_b64_bytes"]
+    pk = summary["pk_b64_bytes"]
+
+    plt.bar(x, body, label="Cuerpo mensaje", color="#90CAF9")
+    plt.bar(x, sig, bottom=body, label="Firma b64", color="#1565C0")
+    plt.bar(x, pk, bottom=body + sig, label="Clave pública b64", color="#FFB74D")
+    plt.bar(x, xml_overhead, bottom=body + sig + pk, label="Overhead XML/XMPP", color="#B0BEC5")
+
+    plt.xticks(list(x), summary.index)
+    plt.ylabel("bytes")
+    plt.title("Desglose del tamaño medio de stanza enviada")
+    plt.grid(True, axis="y", alpha=0.4)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=180)
+    plt.close()
+    print("Saved:", out_png)
+
+
 def main():
     # Crear directorio de figuras si no existe
     os.makedirs(FIGS_DIR, exist_ok=True)
@@ -82,6 +115,12 @@ def main():
         sender, "alg_family", "stanza_bytes",
         "Tamaño medio de stanza enviada (bytes)", "bytes",
         os.path.join(FIGS_DIR, "bar_stanza_bytes_sender.png")
+    )
+
+    stacked_stanza_breakdown(
+        sender,
+        "alg_family",
+        os.path.join(FIGS_DIR, "bar_stanza_breakdown_sender.png")
     )
 
     bar_mean_by_group(

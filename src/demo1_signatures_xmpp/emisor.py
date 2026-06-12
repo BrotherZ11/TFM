@@ -5,6 +5,7 @@ import asyncio
 from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
+from crypto.xmpp_env import get_xmpp_host, get_xmpp_jid, get_xmpp_password, get_xmpp_port
 
 
 
@@ -154,11 +155,11 @@ if __name__ == "__main__":
 
 
 
-    bot = EmisorPQC("emisor@localhost", "123", "receptor@localhost", alg)
+    bot = EmisorPQC(get_xmpp_jid("EMISOR"), get_xmpp_password("EMISOR"), get_xmpp_jid("RECEPTOR"), alg)
 
     bot.register_plugin("xep_0030")  # Service Discovery (no imprescindible)
 
-    bot.connect(host="10.255.255.254", port=5222)
+    bot.connect(host=get_xmpp_host(), port=get_xmpp_port())
 
     bot.loop.run_forever()
 

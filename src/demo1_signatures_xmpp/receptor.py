@@ -3,6 +3,7 @@ import slixmpp
 from slixmpp.xmlstream import ET
 
 from crypto.pqc_wrapper import PQCProvider
+from crypto.xmpp_env import get_xmpp_host, get_xmpp_jid, get_xmpp_password, get_xmpp_port
 
 import time
 
@@ -152,8 +153,8 @@ class ReceptorPQC(slixmpp.ClientXMPP):
 
 if __name__ == "__main__":
 
-    bot = ReceptorPQC("receptor@localhost", "123")
+    bot = ReceptorPQC(get_xmpp_jid("RECEPTOR"), get_xmpp_password("RECEPTOR"))
 
-    bot.connect(host="10.255.255.254", port=5222)
+    bot.connect(host=get_xmpp_host(), port=get_xmpp_port())
 
     bot.loop.run_forever()
