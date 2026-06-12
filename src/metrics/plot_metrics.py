@@ -23,7 +23,8 @@ def boxplot_by_group(df, group_col, value_col, title, ylabel, out_png):
     data = [df2[df2[group_col] == g][value_col].values for g in groups]
 
     plt.figure()
-    plt.boxplot(data, labels=groups, showfliers=True)
+    plt.boxplot(data, showfliers=True) 
+    plt.xticks(range(1, len(groups) + 1), groups)
     plt.title(title)
     plt.ylabel(ylabel)
     plt.grid(True, axis="y")

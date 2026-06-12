@@ -1,4 +1,4 @@
-import osresultados_dis
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -13,7 +13,7 @@ def boxplot_by_group(df, group_col, value_col, title, ylabel, out_png):
     data = [df2[df2[group_col] == g][value_col].values for g in groups]
 
     plt.figure()
-    plt.boxplot(data, labels=groups, showfliers=True)
+    plt.boxplot(data, tick_labels=groups, showfliers=True) 
     plt.title(title)
     plt.ylabel(ylabel)
     plt.grid(True, axis="y")
